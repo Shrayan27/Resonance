@@ -29,3 +29,18 @@ rea analyze /bin/true --provider ghidra --json
 - In Cursor (after restart), ask the agent to investigate a binary, Electron app or website with REA.
 - JavaScript/Electron apps and websites need no Ghidra: `rea analyze-javascript-application <dir> --json`, `rea analyze-web-bundle`.
 - Hopper, IDA, JADX and Kuna providers are optional and not installed.
+
+## Resonance (web music player)
+
+An original, Spotify-web-player-style app built from the REA analysis in `docs/REVERSE_ENGINEERING.md`: library rail, shelf-based home, search, playlist and artist pages, queue and now-playing panels, bottom transport bar, keyboard shortcuts and Media Session support.
+
+- Stack: Next.js 16, React 19, TypeScript, Tailwind v4, shadcn/ui, zustand.
+- Catalog and audio: the public Audius API, proxied by `/api/catalog/*` and `/api/stream/:id`. No account or API key needed.
+- Library (liked songs, playlists) is stored in the browser's localStorage.
+
+```bash
+npm install
+npm run build && npx next start -p 47321   # or: npx next dev -p 47321
+```
+
+Shortcuts: Space play/pause, Left/Right seek 5s, Up/Down volume, `m` mute, `n` next, `p` previous, `s` shuffle, `/` or Ctrl/Cmd+K search.
