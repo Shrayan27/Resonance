@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Home, Search, Trash2, X } from "lucide-react";
+import { Check, Home, Palette, Search, Trash2, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +15,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useLibrary } from "@/stores/library";
-import { LogoMark } from "./Logo";
+import { THEMES, useTheme } from "@/stores/theme";
+import { Logo } from "./Logo";
 
 function SearchBox() {
   const router = useRouter();
@@ -126,6 +127,8 @@ function SearchFallback() {
 }
 
 function AccountMenu() {
+  const theme = useTheme((s) => s.theme);
+  const setTheme = useTheme((s) => s.setTheme);
   const clearLibrary = () => {
     if (!window.confirm("Clear all liked songs, playlists and saved items from this browser? This cannot be undone.")) return;
     useLibrary.setState({ liked: [], playlists: [], savedCollections: [] });
@@ -137,7 +140,7 @@ function AccountMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label="Account menu"
-        className="grid size-9 place-items-center rounded-full bg-linear-to-br from-brand to-sky-400 text-sm font-bold text-brand-foreground outline-none ring-4 ring-black/60 transition-transform hover:scale-105 focus-visible:ring-white/60 aria-expanded:scale-105"
+        className="grid size-9 place-items-center rounded-full bg-linear-to-br from-brand to-brand-2 text-sm font-bold text-brand-foreground outline-none ring-4 ring-black/60 transition-transform hover:scale-105 focus-visible:ring-white/60 aria-expanded:scale-105"
       >
         R
       </DropdownMenuTrigger>
@@ -145,6 +148,23 @@ function AccountMenu() {
         <DropdownMenuGroup>
           <DropdownMenuLabel>Local profile</DropdownMenuLabel>
         </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="flex items-center gap-2">
+            <Palette className="size-3.5" aria-hidden /> Color theme
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
+        {THEMES.map((t) => (
+          <DropdownMenuItem key={t.id} className="gap-2.5 py-2" onClick={() => setTheme(t.id)}>
+            <span
+              aria-hidden
+              className="size-4 rounded-full ring-1 ring-white/20"
+              style={{ backgroundImage: `linear-gradient(135deg, ${t.swatch[0]}, ${t.swatch[1]})` }}
+            />
+            {t.label}
+            {theme === t.id && <Check className="ml-auto size-4" aria-hidden />}
+          </DropdownMenuItem>
+        ))}
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" className="gap-2 py-2" onClick={clearLibrary}>
           <Trash2 /> Clear library data
@@ -175,8 +195,8 @@ export function TopBar({ className }: { className?: string }) {
   return (
     <header className={cn("flex h-14 items-center gap-2 px-1 md:px-2", className)}>
       <div className="flex min-w-0 flex-1 items-center">
-        <Link href="/" aria-label="Resonance home" className="rounded-full p-1.5 transition-transform hover:scale-105">
-          <LogoMark className="size-8" />
+        <Link href="/" aria-label="Resonance home" className="rounded-xl p-1.5 transition-transform hover:scale-105">
+          <Logo className="[&>span]:hidden xl:[&>span]:inline" />
         </Link>
       </div>
       <div className="flex w-full max-w-[560px] min-w-0 shrink items-center gap-2">

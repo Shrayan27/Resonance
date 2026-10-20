@@ -29,14 +29,14 @@ import { Tip, useHydrated } from "./shared";
 const sliderStyle = cn(
   "group/slider py-2",
   "[&_[data-slot=slider-track]]:bg-white/15",
-  "[&_[data-slot=slider-range]]:bg-linear-to-r [&_[data-slot=slider-range]]:from-emerald-400 [&_[data-slot=slider-range]]:to-teal-300",
+  "[&_[data-slot=slider-range]]:bg-linear-to-r [&_[data-slot=slider-range]]:from-brand [&_[data-slot=slider-range]]:to-brand-2",
   "[&_[data-slot=slider-thumb]]:size-3 [&_[data-slot=slider-thumb]]:border-0 [&_[data-slot=slider-thumb]]:opacity-0 [&_[data-slot=slider-thumb]]:shadow",
   "hover:[&_[data-slot=slider-thumb]]:opacity-100 focus-within:[&_[data-slot=slider-thumb]]:opacity-100 active:[&_[data-slot=slider-thumb]]:opacity-100",
   "[&_[data-slot=slider-track]]:transition-[height] hover:[&_[data-slot=slider-track]]:data-horizontal:h-1.5",
 );
 
 const iconBtn =
-  "inline-flex size-9 items-center justify-center rounded-full text-zinc-400 transition-colors outline-none hover:text-white focus-visible:ring-2 focus-visible:ring-emerald-400/70 disabled:pointer-events-none disabled:opacity-40";
+  "inline-flex size-9 items-center justify-center rounded-full text-zinc-400 transition-colors outline-none hover:text-white focus-visible:ring-2 focus-visible:ring-brand/70 disabled:pointer-events-none disabled:opacity-40";
 
 function sliderNumber(v: number | readonly number[]): number {
   return Array.isArray(v) ? (v[0] ?? 0) : (v as number);
@@ -146,7 +146,7 @@ function LikeButton({ className }: { className?: string }) {
     <Tip label={liked ? "Remove from Liked Songs" : "Save to Liked Songs"}>
       <button
         type="button"
-        className={cn(iconBtn, "size-8", liked && "text-emerald-400 hover:text-emerald-300", className)}
+        className={cn(iconBtn, "size-8", liked && "text-brand hover:text-brand-strong", className)}
         aria-label={liked ? "Remove from Liked Songs" : "Save to Liked Songs"}
         aria-pressed={liked}
         onClick={() => toggleLike(track)}
@@ -172,7 +172,7 @@ function PlayToggle({ size = "lg", disabled }: { size?: "lg" | "sm"; disabled: b
         disabled={disabled}
         aria-label={label}
         className={cn(
-          "inline-flex items-center justify-center rounded-full bg-white text-black shadow-md transition-transform outline-none hover:scale-105 focus-visible:ring-2 focus-visible:ring-emerald-400 active:scale-95 disabled:pointer-events-none disabled:opacity-40",
+          "inline-flex items-center justify-center rounded-full bg-white text-black shadow-md transition-transform outline-none hover:scale-105 focus-visible:ring-2 focus-visible:ring-brand active:scale-95 disabled:pointer-events-none disabled:opacity-40",
           size === "lg" ? "size-10" : "size-9",
         )}
       >
@@ -230,9 +230,9 @@ export function PlayerBar() {
   const repeatMode = hydrated ? repeat : "off";
   const RepeatIcon = repeatMode === "one" ? Repeat1 : Repeat;
   const repeatLabel = repeatMode === "off" ? "Enable repeat" : repeatMode === "all" ? "Repeat one" : "Disable repeat";
-  const active = "text-emerald-400 hover:text-emerald-300";
+  const active = "text-brand hover:text-brand-strong";
   const dot = (
-    <span aria-hidden="true" className="absolute bottom-0.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-emerald-400" />
+    <span aria-hidden="true" className="absolute bottom-0.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-brand" />
   );
 
   return (
@@ -253,7 +253,7 @@ export function PlayerBar() {
         <div className="relative md:hidden">
           <div className="absolute inset-x-0 top-0 h-0.5 bg-white/10" aria-hidden="true">
             <div
-              className="h-full bg-linear-to-r from-emerald-400 to-teal-300 transition-[width] duration-300 ease-linear"
+              className="h-full bg-linear-to-r from-brand to-brand-2 transition-[width] duration-300 ease-linear"
               style={{ width: `${Math.min(100, Math.max(0, progress * 100))}%` }}
             />
           </div>

@@ -63,19 +63,28 @@ export function mapArtist(u: any): Artist {
 
 const playable = (t: any) => t.is_streamable !== false && !t.is_delete && !t.is_unlisted;
 
-export const GENRES = ["Electronic", "Hip-Hop/Rap", "Lo-Fi", "Pop", "Rock", "Jazz"] as const;
+import { HOME_GENRES } from "./genres";
+
+const GENRE_NAMES = HOME_GENRES.map((g) => g.name);
+
+export async function getGenreTracks(genre: string, offset = 0, limit = 40, time?: string): Promise<Track[]> {
+  const params: Record<string, string | number> = { genre, limit, offset };
+  if (time) params.time = time;
+  const tracks = await call<any[]>("/tracks/trending", params);
+  return tracks.filter(playable).map(mapTrack);
+}
 
 export async function getHome(): Promise<HomeFeed> {
   const [trending, playlists, artists, ...genreTracks] = await Promise.all([
-    call<any[]>("/tracks/trending", { limit: 20 }),
-    call<any[]>("/playlists/trending", { limit: 12 }),
+    call<any[]>("/tracks/trending", { limit: 40 }),
+    call<any[]>("/playlists/trending", { limit: 24 }),
     Promise.resolve([] as any[]),
-    ...GENRES.map((g) =>
-      call<any[]>("/tracks/trending", { limit: 12, genre: g }).catch(() => [] as any[]),
+    ...GENRE_NAMES.map((g) =>
+      call<any[]>("/tracks/trending", { limit: 20, genre: g }).catch(() => [] as any[]),
     ),
   ]);
   const genres: Record<string, Track[]> = {};
-  GENRES.forEach((g, i) => {
+  GENRE_NAMES.forEach((g, i) => {
     const list = genreTracks[i].filter(playable).map(mapTrack);
     if (list.length) genres[g] = list;
   });
@@ -83,7 +92,7 @@ export async function getHome(): Promise<HomeFeed> {
   const derivedArtists = [...trending, ...genreTracks.flat()]
     .map((t) => t.user)
     .filter((u) => u && !seen.has(u.id) && seen.add(u.id))
-    .slice(0, 12);
+    .slice(0, 24);
   return {
     trending: trending.filter(playable).map(mapTrack),
     playlists: playlists.filter((p) => !p.is_delete && !p.is_private).map(mapCollection),
@@ -94,9 +103,9 @@ export async function getHome(): Promise<HomeFeed> {
 
 export async function search(query: string): Promise<SearchResults> {
   const [tracks, playlists, artists] = await Promise.all([
-    call<any[]>("/tracks/search", { query, limit: 25 }),
-    call<any[]>("/playlists/search", { query, limit: 12 }),
-    call<any[]>("/users/search", { query, limit: 12 }),
+    call<any[]>("/tracks/search", { query, limit: 50 }),
+    call<any[]>("/playlists/search", { query, limit: 20 }),
+    call<any[]>("/users/search", { query, limit: 20 }),
   ]);
   return {
     query,

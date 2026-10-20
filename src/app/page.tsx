@@ -7,6 +7,7 @@ import { QuickPick } from "@/components/media/QuickPick";
 import { CardSkeleton, Shelf, ShelfSkeleton } from "@/components/media/Shelf";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHome } from "@/lib/api";
+import { genreHref } from "@/lib/genres";
 import { useHydrated } from "@/lib/use-hydrated";
 
 function greeting(): string {
@@ -67,7 +68,7 @@ export default function HomePage() {
           {Object.entries(data.genres)
             .filter(([, tracks]) => tracks.length > 0)
             .map(([genre, tracks]) => (
-              <Shelf key={genre} title={genre} href={`/search?q=${encodeURIComponent(genre)}`}>
+              <Shelf key={genre} title={genre} href={genreHref(genre)}>
                 {tracks.map((t) => (
                   <TrackCard key={t.id} track={t} context={tracks} />
                 ))}

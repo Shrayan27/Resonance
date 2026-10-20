@@ -1,32 +1,49 @@
+import { useId } from "react";
 import { cn } from "@/lib/utils";
 
-export function LogoMark({ className }: { className?: string }) {
+/**
+ * Resonance mark: a glowing core with three sound rings radiating from it,
+ * set on a rounded gradient tile. Colors follow the active accent theme.
+ */
+export function LogoMark({ className, tile = true }: { className?: string; tile?: boolean }) {
+  const id = useId().replace(/:/g, "");
   return (
-    <svg
-      viewBox="0 0 32 32"
-      aria-hidden="true"
-      className={cn("size-8 shrink-0", className)}
-      fill="none"
-    >
+    <svg viewBox="0 0 48 48" aria-hidden="true" className={cn("size-9 shrink-0", className)} fill="none">
       <defs>
-        <linearGradient id="resonance-logo-g" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#52f2bb" />
-          <stop offset="1" stopColor="#1fb6d6" />
+        <linearGradient id={`${id}-bg`} x1="4" y1="2" x2="44" y2="46" gradientUnits="userSpaceOnUse">
+          <stop stopColor="var(--brand-strong, #52f2bb)" />
+          <stop offset="0.55" stopColor="var(--brand, #2ee6a6)" />
+          <stop offset="1" stopColor="var(--brand-2, #1fb6d6)" />
         </linearGradient>
+        <radialGradient id={`${id}-core`} cx="0.35" cy="0.3" r="0.9">
+          <stop stopColor="#ffffff" />
+          <stop offset="1" stopColor="#ffffff" stopOpacity="0.82" />
+        </radialGradient>
+        <radialGradient id={`${id}-glow`} cx="0.5" cy="0.5" r="0.5">
+          <stop stopColor="#ffffff" stopOpacity="0.55" />
+          <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+        </radialGradient>
       </defs>
-      <circle cx="9" cy="16" r="3" fill="url(#resonance-logo-g)" />
-      <path d="M14.5 10.5a7.6 7.6 0 0 1 0 11" stroke="url(#resonance-logo-g)" strokeWidth="2.4" strokeLinecap="round" />
-      <path d="M19.5 7a12.6 12.6 0 0 1 0 18" stroke="url(#resonance-logo-g)" strokeWidth="2.4" strokeLinecap="round" opacity="0.75" />
-      <path d="M24.5 3.6a17.4 17.4 0 0 1 0 24.8" stroke="url(#resonance-logo-g)" strokeWidth="2.4" strokeLinecap="round" opacity="0.45" />
+      {tile && <rect width="48" height="48" rx="13" fill={`url(#${id}-bg)`} />}
+      {tile && <path d="M0 14C0 6.3 6.3 0 14 0h20c7.7 0 14 6.3 14 14v2C34 13 14 22 0 18V14Z" fill="#fff" opacity="0.16" />}
+      <circle cx="17" cy="24" r="9" fill={`url(#${id}-glow)`} />
+      <circle cx="17" cy="24" r="4.6" fill={`url(#${id}-core)`} />
+      <path d="M24.2 17.2a9.6 9.6 0 0 1 0 13.6" stroke={tile ? "#fff" : `url(#${id}-bg)`} strokeWidth="3" strokeLinecap="round" />
+      <path d="M29.8 12.4a17 17 0 0 1 0 23.2" stroke={tile ? "#fff" : `url(#${id}-bg)`} strokeWidth="3" strokeLinecap="round" opacity="0.72" />
+      <path d="M35.6 7.8a24.4 24.4 0 0 1 0 32.4" stroke={tile ? "#fff" : `url(#${id}-bg)`} strokeWidth="3" strokeLinecap="round" opacity="0.4" />
     </svg>
   );
 }
 
 export function Logo({ className, showWordmark = true }: { className?: string; showWordmark?: boolean }) {
   return (
-    <span className={cn("inline-flex items-center gap-2", className)}>
+    <span className={cn("inline-flex items-center gap-2.5", className)}>
       <LogoMark />
-      {showWordmark && <span className="text-lg font-bold tracking-tight text-white">Resonance</span>}
+      {showWordmark && (
+        <span className="bg-linear-to-r from-white via-white to-brand-strong bg-clip-text text-xl font-extrabold tracking-tight text-transparent">
+          Resonance
+        </span>
+      )}
     </span>
   );
 }

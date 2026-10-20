@@ -17,7 +17,7 @@ function PanelHeader({ title, onClose }: { title: string; onClose: () => void })
         onClick={onClose}
         aria-label="Close panel"
         title="Close"
-        className="inline-flex size-8 items-center justify-center rounded-full text-zinc-400 transition-colors outline-none hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-emerald-400/70"
+        className="inline-flex size-8 items-center justify-center rounded-full text-zinc-400 transition-colors outline-none hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-brand/70"
       >
         <X className="size-4" />
       </button>
@@ -101,7 +101,7 @@ function QueueRow({ track, index, current, isPlaying }: { track: Track; index: n
         onClick={() => jumpTo(index)}
         aria-label={`Play ${track.title} by ${track.artist.name}`}
         className={cn(
-          "flex w-full items-center gap-3 rounded-md p-2 pr-10 text-left transition-colors outline-none hover:bg-white/8 focus-visible:ring-2 focus-visible:ring-emerald-400/70",
+          "flex w-full items-center gap-3 rounded-md p-2 pr-10 text-left transition-colors outline-none hover:bg-white/8 focus-visible:ring-2 focus-visible:ring-brand/70",
           current && "bg-white/5",
         )}
       >
@@ -115,7 +115,7 @@ function QueueRow({ track, index, current, isPlaying }: { track: Track; index: n
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className={cn("truncate text-sm font-medium", current ? "text-emerald-400" : "text-white")}>{track.title}</p>
+          <p className={cn("truncate text-sm font-medium", current ? "text-brand" : "text-white")}>{track.title}</p>
           <p className="truncate text-xs text-zinc-400">{track.artist.name}</p>
         </div>
       </button>
@@ -125,7 +125,7 @@ function QueueRow({ track, index, current, isPlaying }: { track: Track; index: n
           onClick={() => remove(index)}
           aria-label={`Remove ${track.title} from queue`}
           title="Remove from queue"
-          className="absolute top-1/2 right-2 inline-flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-zinc-400 opacity-0 transition-opacity outline-none group-hover/row:opacity-100 hover:bg-white/10 hover:text-white focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-emerald-400/70 max-lg:opacity-100"
+          className="absolute top-1/2 right-2 inline-flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-zinc-400 opacity-0 transition-opacity outline-none group-hover/row:opacity-100 hover:bg-white/10 hover:text-white focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand/70 max-lg:opacity-100"
         >
           <X className="size-4" />
         </button>

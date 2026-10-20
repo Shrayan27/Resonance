@@ -29,7 +29,7 @@ export function Equalizer({ active, className }: { active: boolean; className?: 
       {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className="w-[3px] rounded-sm bg-emerald-400"
+          className="w-[3px] rounded-sm bg-brand"
           style={{
             height: active ? undefined : "35%",
             animation: active ? `resonance-eq 0.9s ease-in-out ${i * 0.18}s infinite alternate` : undefined,

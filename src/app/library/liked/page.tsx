@@ -34,7 +34,7 @@ export default function LikedSongsPage() {
         title="Liked Songs"
         seed="liked-songs"
         cover={
-          <div className="grid aspect-square w-40 shrink-0 place-items-center rounded-lg bg-linear-to-br from-emerald-400 via-teal-500 to-indigo-600 shadow-2xl shadow-black/60 sm:w-48 lg:w-56">
+          <div className="grid aspect-square w-40 shrink-0 place-items-center rounded-lg bg-linear-to-br from-brand via-brand-2 to-indigo-600 shadow-2xl shadow-black/60 sm:w-48 lg:w-56">
             <Heart className="size-1/2 text-white" fill="currentColor" aria-hidden />
           </div>
         }
