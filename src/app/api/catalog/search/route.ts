@@ -1,11 +1,57 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { search } from "@/lib/audius";
+import { search as searchAudius } from "@/lib/audius";
+import { searchSaavn } from "@/lib/saavn";
 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim();
   if (!q) return NextResponse.json({ query: "", tracks: [], playlists: [], artists: [] });
+
   try {
-    return NextResponse.json(await search(q));
+    // Query both Saavn (commercial original tracks) and Audius concurrently
+    const [saavnRes, audiusRes] = await Promise.allSettled([
+      searchSaavn(q),
+      searchAudius(q),
+    ]);
+
+    const saavn = saavnRes.status === "fulfilled" ? saavnRes.value : { tracks: [], artists: [], playlists: [] };
+    const audius = audiusRes.status === "fulfilled" ? audiusRes.value : { tracks: [], artists: [], playlists: [] };
+
+    // Deduplicate and prioritize Saavn original tracks
+    const trackIds = new Set<string>();
+    const combinedTracks = [];
+    for (const t of [...saavn.tracks, ...audius.tracks]) {
+      if (!trackIds.has(t.id)) {
+        trackIds.add(t.id);
+        combinedTracks.push(t);
+      }
+    }
+
+    const artistNames = new Set<string>();
+    const combinedArtists = [];
+    for (const a of [...saavn.artists, ...audius.artists]) {
+      const lower = a.name.toLowerCase();
+      if (!artistNames.has(lower)) {
+        artistNames.add(lower);
+        combinedArtists.push(a);
+      }
+    }
+
+    const playlistTitles = new Set<string>();
+    const combinedPlaylists = [];
+    for (const p of [...saavn.playlists, ...audius.playlists]) {
+      const lower = p.title.toLowerCase();
+      if (!playlistTitles.has(lower)) {
+        playlistTitles.add(lower);
+        combinedPlaylists.push(p);
+      }
+    }
+
+    return NextResponse.json({
+      query: q,
+      tracks: combinedTracks,
+      artists: combinedArtists,
+      playlists: combinedPlaylists,
+    });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 });
   }

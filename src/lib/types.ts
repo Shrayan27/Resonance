@@ -71,3 +71,16 @@ export interface UserPlaylist {
   tracks: Track[];
   createdAt: number;
 }
+
+export interface LyricLine {
+  time: number;
+  text: string;
+}
+
+export interface LyricsResult {
+  synced: boolean;
+  instrumental?: boolean;
+  lines?: LyricLine[];
+  plain?: string;
+  source?: string;
+}

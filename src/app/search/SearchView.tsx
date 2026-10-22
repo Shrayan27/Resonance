@@ -57,7 +57,7 @@ export function SearchView() {
             <h2 id="songs" className="mb-3 text-2xl font-bold tracking-tight">
               Songs
             </h2>
-            <ExpandableTrackList tracks={data.tracks} label={`Songs matching ${q}`} hideHeader />
+            <ExpandableTrackList tracks={data.tracks} label={`Songs matching ${q}`} hideHeader isSearch />
           </section>
         )}
       </div>
@@ -82,7 +82,7 @@ export function SearchView() {
 
 function TopResult({ data, q }: { data: SearchResults; q: string }) {
   const playQueue = usePlayer((s) => s.playQueue);
-  const playTrack = usePlayer((s) => s.playTrack);
+  const playTrackWithSmartQueue = usePlayer((s) => s.playTrackWithSmartQueue);
   const toggle = usePlayer((s) => s.toggle);
   const firstTrack = data.tracks[0];
   const isCurrent = usePlayer((s) => (firstTrack ? selectCurrentTrack(s)?.id === firstTrack.id : false));
@@ -100,6 +100,8 @@ function TopResult({ data, q }: { data: SearchResults; q: string }) {
   const link = `${heading} outline-none after:absolute after:inset-0 after:z-10 after:content-[''] focus-visible:after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring`;
   const pill = "w-fit rounded-full bg-black/40 px-3 py-1 text-xs font-semibold";
 
+  const openArtistPanel = usePlayer((s) => s.openArtistPanel);
+
   if (kind === "artist" && topArtist) {
     return (
       <div className={shell}>
@@ -108,9 +110,19 @@ function TopResult({ data, q }: { data: SearchResults; q: string }) {
           <Link href={`/artist/${topArtist.id}`} className={`block truncate ${link}`}>
             {topArtist.name}
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className={pill}>Artist</span>
             <span className="text-sm text-muted-foreground">{formatCount(topArtist.followers)} followers</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                openArtistPanel({ id: topArtist.id, name: topArtist.name });
+              }}
+              className="relative z-20 rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-white/20"
+            >
+              All songs in side panel
+            </button>
           </div>
         </div>
         <CardPlayButton
@@ -147,7 +159,7 @@ function TopResult({ data, q }: { data: SearchResults; q: string }) {
         <CardPlayButton
           label={`${playing ? "Pause" : "Play"} ${firstTrack.title}`}
           playing={playing}
-          onPlay={() => (isCurrent ? toggle() : playTrack(firstTrack, data.tracks))}
+          onPlay={() => (isCurrent ? toggle() : playTrackWithSmartQueue(firstTrack))}
           className="right-5 bottom-5"
         />
       </div>

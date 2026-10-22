@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { ArtistDetail, CollectionDetail, HomeFeed, SearchResults } from "@/lib/types";
+import type { ArtistDetail, CollectionDetail, HomeFeed, SearchResults, Track } from "@/lib/types";
 
 const TTL_MS = 5 * 60_000;
 
@@ -56,6 +56,21 @@ export const fetchCollection = (id: string) =>
   fetchJson<CollectionDetail>(`/api/catalog/playlists/${encodeURIComponent(id)}`);
 export const fetchArtist = (id: string) =>
   fetchJson<ArtistDetail>(`/api/catalog/artists/${encodeURIComponent(id)}`);
+export const fetchRecommendations = (params: {
+  artist?: string;
+  genre?: string;
+  seedTitle?: string;
+  seedId?: string;
+  exclude?: string[];
+}) => {
+  const sp = new URLSearchParams();
+  if (params.artist) sp.set("artist", params.artist);
+  if (params.genre) sp.set("genre", params.genre);
+  if (params.seedTitle) sp.set("seedTitle", params.seedTitle);
+  if (params.seedId) sp.set("seedId", params.seedId);
+  if (params.exclude?.length) sp.set("exclude", params.exclude.join(","));
+  return fetchJson<{ tracks: Track[] }>(`/api/catalog/recommendations?${sp.toString()}`);
+};
 
 export interface QueryState<T> {
   data: T | undefined;
