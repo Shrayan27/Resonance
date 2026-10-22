@@ -6,11 +6,14 @@ import {
   Heart,
   ListMusic,
   Loader2,
+  MicVocal,
   MonitorSpeaker,
   Pause,
   Play,
   Repeat,
   Repeat1,
+  RotateCcw,
+  RotateCw,
   Shuffle,
   SkipBack,
   SkipForward,
@@ -221,6 +224,7 @@ export function PlayerBar() {
   const error = usePlayer((s) => s.error);
   const next = usePlayer((s) => s.next);
   const previous = usePlayer((s) => s.previous);
+  const seekBy = usePlayer((s) => s.seekBy);
   const toggleShuffle = usePlayer((s) => s.toggleShuffle);
   const cycleRepeat = usePlayer((s) => s.cycleRepeat);
   const setPanel = usePlayer((s) => s.setPanel);
@@ -262,6 +266,17 @@ export function PlayerBar() {
               <TrackInfo compact />
             </div>
             <LikeButton />
+            <Tip label="Lyrics">
+              <button
+                type="button"
+                className={cn(iconBtn, panel === "lyrics" && active)}
+                aria-label="Lyrics"
+                onClick={() => setPanel(panel === "lyrics" ? "none" : "lyrics")}
+                disabled={!hasTrack}
+              >
+                <MicVocal className="size-[18px]" />
+              </button>
+            </Tip>
             <Tip label="Queue">
               <button
                 type="button"
@@ -304,7 +319,29 @@ export function PlayerBar() {
                   <SkipBack className="size-5 fill-current" />
                 </button>
               </Tip>
+              <Tip label="Rewind 5s (← / J)">
+                <button
+                  type="button"
+                  className={cn(iconBtn, "size-8 text-zinc-400 hover:text-white")}
+                  aria-label="Rewind 5 seconds"
+                  onClick={() => seekBy(-5)}
+                  disabled={!hasTrack}
+                >
+                  <RotateCcw className="size-[15px]" />
+                </button>
+              </Tip>
               <PlayToggle disabled={!hasTrack} />
+              <Tip label="Forward 5s (→ / L)">
+                <button
+                  type="button"
+                  className={cn(iconBtn, "size-8 text-zinc-400 hover:text-white")}
+                  aria-label="Forward 5 seconds"
+                  onClick={() => seekBy(5)}
+                  disabled={!hasTrack}
+                >
+                  <RotateCw className="size-[15px]" />
+                </button>
+              </Tip>
               <Tip label="Next (N)">
                 <button type="button" className={iconBtn} aria-label="Next" onClick={next} disabled={!hasTrack}>
                   <SkipForward className="size-5 fill-current" />
@@ -337,6 +374,18 @@ export function PlayerBar() {
                 onClick={() => setPanel(panel === "nowPlaying" ? "none" : "nowPlaying")}
               >
                 <MonitorSpeaker className="size-[18px]" />
+              </button>
+            </Tip>
+            <Tip label="Lyrics">
+              <button
+                type="button"
+                className={cn(iconBtn, panel === "lyrics" && active)}
+                aria-label="Lyrics"
+                aria-pressed={panel === "lyrics"}
+                onClick={() => setPanel(panel === "lyrics" ? "none" : "lyrics")}
+                disabled={!hasTrack}
+              >
+                <MicVocal className="size-[18px]" />
               </button>
             </Tip>
             <Tip label="Queue">

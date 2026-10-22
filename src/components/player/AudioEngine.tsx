@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useRef } from "react";
@@ -22,12 +23,17 @@ function isInteractive(target: EventTarget | null): boolean {
 function tryPlay(audio: HTMLAudioElement) {
   const result = audio.play();
   if (!result) return;
-  result.catch((err: unknown) => {
-    const name = err instanceof DOMException ? err.name : "";
-    if (name === "AbortError") return;
-    if (name === "NotSupportedError") return;
-    usePlayer.getState().pause();
-  });
+  result
+    .then(() => {
+      usePlayer.getState().setBuffering(false);
+    })
+    .catch((err: unknown) => {
+      const name = err instanceof DOMException ? err.name : "";
+      usePlayer.getState().setBuffering(false);
+      if (name === "AbortError") return;
+      if (name === "NotSupportedError") return;
+      usePlayer.getState().pause();
+    });
 }
 
 export function AudioEngine() {
@@ -35,6 +41,7 @@ export function AudioEngine() {
   const pendingSeek = useRef<number | null>(null);
   const lastProgressAt = useRef(0);
   const errorStreak = useRef(0);
+  const lastTrackId = useRef<string | null>(null);
 
   const track = usePlayer(selectCurrentTrack);
   const trackId = track?.id ?? null;
@@ -45,28 +52,52 @@ export function AudioEngine() {
   const seekRequest = usePlayer((s) => s.seekRequest);
   const error = usePlayer((s) => s.error);
 
+  // Unified single playback and track transition controller
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    pendingSeek.current = null;
-    if (!streamUrl) {
+
+    if (!streamUrl || !trackId) {
+      lastTrackId.current = null;
+      pendingSeek.current = null;
       audio.removeAttribute("src");
       audio.load();
       usePlayer.getState().setBuffering(false);
       return;
     }
-    audio.src = streamUrl;
-    audio.load();
-    usePlayer.getState().setBuffering(true);
-    if (usePlayer.getState().isPlaying) tryPlay(audio);
-  }, [streamUrl, trackId]);
 
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !streamUrl) return;
-    if (isPlaying) tryPlay(audio);
-    else audio.pause();
-  }, [isPlaying, streamUrl]);
+    const isNewTrack = lastTrackId.current !== trackId;
+
+    if (isNewTrack) {
+      lastTrackId.current = trackId;
+      pendingSeek.current = null;
+      audio.src = streamUrl;
+      audio.load();
+      if (isPlaying) {
+        usePlayer.getState().setBuffering(true);
+        tryPlay(audio);
+      } else {
+        usePlayer.getState().setBuffering(false);
+      }
+    } else {
+      // Same track: purely handle play / pause toggling
+      if (isPlaying) {
+        if (audio.paused) {
+          tryPlay(audio);
+        }
+      } else {
+        if (!audio.paused) {
+          audio.pause();
+        }
+        usePlayer.getState().setBuffering(false);
+        const current = selectCurrentTrack(usePlayer.getState());
+        const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : (current?.durationSec ?? 0);
+        if (Number.isFinite(audio.currentTime)) {
+          usePlayer.getState().setProgress(audio.currentTime, duration);
+        }
+      }
+    }
+  }, [streamUrl, trackId, isPlaying]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -97,10 +128,18 @@ export function AudioEngine() {
       lastProgressAt.current = now;
       const current = selectCurrentTrack(store.getState());
       const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : (current?.durationSec ?? 0);
-      store.getState().setProgress(audio.currentTime, duration);
+      if (Number.isFinite(audio.currentTime)) {
+        store.getState().setProgress(audio.currentTime, duration);
+      }
     };
 
-    const onTimeUpdate = () => reportProgress();
+    const onTimeUpdate = () => {
+      if (store.getState().buffering) {
+        store.getState().setBuffering(false);
+      }
+      reportProgress();
+    };
+
     const onLoadedMetadata = () => {
       if (pendingSeek.current !== null) {
         audio.currentTime = pendingSeek.current;
@@ -108,24 +147,68 @@ export function AudioEngine() {
       }
       reportProgress(true);
     };
+
+    const onLoadedData = () => {
+      store.getState().setBuffering(false);
+    };
+
     const onDurationChange = () => reportProgress(true);
-    const onWaiting = () => store.getState().setBuffering(true);
+
+    const onWaiting = () => {
+      if (store.getState().isPlaying) {
+        store.getState().setBuffering(true);
+      }
+    };
+
+    const onStalled = () => {
+      if (store.getState().isPlaying && audio.readyState < 2) {
+        store.getState().setBuffering(true);
+      }
+    };
+
     const onPlaying = () => {
       errorStreak.current = 0;
       const s = store.getState();
       s.setBuffering(false);
       if (s.error) s.setError(null);
+      if (!s.isPlaying) {
+        s.play();
+      }
+      if (typeof navigator !== "undefined" && "mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "playing";
+      }
     };
+
     const onCanPlay = () => store.getState().setBuffering(false);
-    const onSeeked = () => reportProgress(true);
+    const onCanPlayThrough = () => store.getState().setBuffering(false);
+    const onSeeked = () => {
+      store.getState().setBuffering(false);
+      reportProgress(true);
+    };
+
     const onPause = () => {
-      if (audio.paused && !audio.ended && !audio.seeking && store.getState().isPlaying) {
+      store.getState().setBuffering(false);
+      reportProgress(true);
+      if (store.getState().isPlaying) {
         store.getState().pause();
+      }
+      if (typeof navigator !== "undefined" && "mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "paused";
       }
     };
 
     const onEnded = () => {
+      store.getState().setBuffering(false);
       const s = store.getState();
+      const current = selectCurrentTrack(s);
+      const trackDuration = current?.durationSec ?? 0;
+      const actualDuration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : trackDuration;
+
+      // Guard: Ignore premature 'ended' events triggered if network stream closed prematurely mid-song
+      if (actualDuration > 5 && audio.currentTime < actualDuration - 2) {
+        return;
+      }
+
       if (s.repeat === "one") {
         audio.currentTime = 0;
         tryPlay(audio);
@@ -168,11 +251,13 @@ export function AudioEngine() {
     const events: [string, () => void][] = [
       ["timeupdate", onTimeUpdate],
       ["loadedmetadata", onLoadedMetadata],
+      ["loadeddata", onLoadedData],
       ["durationchange", onDurationChange],
       ["waiting", onWaiting],
-      ["stalled", onWaiting],
+      ["stalled", onStalled],
       ["playing", onPlaying],
       ["canplay", onCanPlay],
+      ["canplaythrough", onCanPlayThrough],
       ["seeked", onSeeked],
       ["pause", onPause],
       ["ended", onEnded],
@@ -242,6 +327,7 @@ export function AudioEngine() {
     };
     set("play", () => s().play());
     set("pause", () => s().pause());
+    set("stop", () => s().pause());
     set("previoustrack", () => s().previous());
     set("nexttrack", () => s().next());
     set("seekbackward", (d) => s().seek(Math.max(0, s().position - (d.seekOffset ?? SEEK_STEP))));
@@ -250,7 +336,7 @@ export function AudioEngine() {
       if (typeof d.seekTime === "number") s().seek(d.seekTime);
     });
     return () => {
-      for (const a of ["play", "pause", "previoustrack", "nexttrack", "seekbackward", "seekforward", "seekto"] as const) {
+      for (const a of ["play", "pause", "stop", "previoustrack", "nexttrack", "seekbackward", "seekforward", "seekto"] as const) {
         set(a, null);
       }
     };
@@ -264,19 +350,59 @@ export function AudioEngine() {
       const hasTrack = s.index >= 0;
 
       switch (e.key) {
+        // Earphone tap & Bluetooth headset media buttons
+        case "MediaPlayPause":
+        case "MediaPause":
+        case "MediaStop":
+        case "AudioPause":
+        case "AudioPlayPause":
         case " ":
         case "Spacebar":
           if (isInteractive(e.target)) return;
           e.preventDefault();
           s.toggle();
           return;
+        case "MediaPlay":
+        case "AudioPlay":
+          e.preventDefault();
+          s.play();
+          return;
+        case "MediaTrackNext":
+          e.preventDefault();
+          if (hasTrack) s.next();
+          return;
+        case "MediaTrackPrevious":
+          e.preventDefault();
+          if (hasTrack) s.previous();
+          return;
         case "ArrowRight":
         case "ArrowLeft": {
-          if (e.shiftKey || isInteractive(e.target) || !hasTrack) return;
+          if (e.shiftKey || isEditable(e.target) || !hasTrack) return;
           e.preventDefault();
+          const audio = audioRef.current;
+          const currentPos = audio && Number.isFinite(audio.currentTime) ? audio.currentTime : s.position;
           const delta = e.key === "ArrowRight" ? SEEK_STEP : -SEEK_STEP;
           const max = s.duration > 0 ? s.duration : Infinity;
-          s.seek(Math.min(max, Math.max(0, s.position + delta)));
+          s.seek(Math.min(max, Math.max(0, currentPos + delta)));
+          return;
+        }
+        case "j":
+        case "J": {
+          if (isEditable(e.target) || !hasTrack) return;
+          e.preventDefault();
+          const audio = audioRef.current;
+          const currentPos = audio && Number.isFinite(audio.currentTime) ? audio.currentTime : s.position;
+          s.seek(Math.max(0, currentPos - SEEK_STEP));
+          return;
+        }
+        case "l":
+        case "L": {
+          if (isEditable(e.target) || !hasTrack) return;
+          e.preventDefault();
+          const audio = audioRef.current;
+          const currentPos = audio && Number.isFinite(audio.currentTime) ? audio.currentTime : s.position;
+          const max = s.duration > 0 ? s.duration : Infinity;
+          s.seek(Math.min(max, currentPos + SEEK_STEP));
           return;
         }
         case "ArrowUp":
