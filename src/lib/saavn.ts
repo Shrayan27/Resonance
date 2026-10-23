@@ -286,7 +286,7 @@ function isAlbumByArtist(album: any, artistName: string, artistId: string): bool
 export async function getSaavnArtist(artistIdWithPrefix: string): Promise<ArtistDetail> {
   const rawId = artistIdWithPrefix.replace(/^saavn:/, "");
 
-  // 1. Fetch artist details with up to 50 songs and 30 albums directly
+  // 1. Fetch artist details with up to 50 songs and 30 albums for primary profile
   const details = await callSaavn<any>({
     __call: "artist.getArtistPageDetails",
     artistId: rawId,
@@ -299,41 +299,62 @@ export async function getSaavnArtist(artistIdWithPrefix: string): Promise<Artist
   }
 
   const artist = mapSaavnArtist(details);
+  const normTarget = normalizeArtistText(artist.name);
 
-  // 2. Fetch top songs from official artist page
-  const topRaw: any[] = (details.topSongs || []).filter((s: any) =>
-    isSongByArtist(s, artist.name, rawId)
-  );
+  // 2. Fetch top songs from primary artist page
+  const primaryRaw: any[] = details.topSongs || [];
 
-  // 3. Search for the artist name to aggregate popular hits & collaborations (e.g. Abdul Hannan & Rovalio)
-  let extraSongsRaw: any[] = [];
+  // 3. Find related collaboration profiles on JioSaavn (e.g. "Abdul Hannan & Rovalio", "Rovalio & Abdul Hannan", "Abdul Hannan & BAIG")
+  const relatedSongsRaw: any[] = [];
   try {
-    const moreSongsRes = await callSaavn<{ results?: any[] }>({
-      __call: "search.getResults",
+    const artistSearch = await callSaavn<{ results?: any[] }>({
+      __call: "search.getArtistResults",
       q: artist.name,
-      p: 1,
-      n: 50,
+      n: 8,
     });
-    extraSongsRaw = (moreSongsRes?.results || []).filter((s: any) =>
-      isSongByArtist(s, artist.name, rawId)
-    );
+
+    const targetRegex = new RegExp(`(^|\\b)${escapeRegex(normTarget)}(\\b|$)`, "i");
+
+    const matchingProfiles = (artistSearch?.results || []).filter((a: any) => {
+      const aId = String(a.id || "").trim();
+      if (aId === rawId) return false;
+      const aName = normalizeArtistText(a.name || "");
+      return targetRegex.test(aName);
+    });
+
+    if (matchingProfiles.length > 0) {
+      const relatedDetails = await Promise.all(
+        matchingProfiles.slice(0, 5).map((p: any) =>
+          callSaavn<any>({
+            __call: "artist.getArtistPageDetails",
+            artistId: p.id,
+            n_song: 30,
+          })
+        )
+      );
+
+      for (const rd of relatedDetails) {
+        if (rd?.topSongs && Array.isArray(rd.topSongs)) {
+          relatedSongsRaw.push(...rd.topSongs);
+        }
+      }
+    }
   } catch {
-    // Graceful fallback to topRaw
+    // Graceful fallback to primary tracks
   }
 
   const seen = new Set<string>();
   const allTracks: Track[] = [];
 
-  // Merge search hits (which include major collaborative hits like Iraaday, Bikhra) and official artist page tracks
-  for (const s of [...extraSongsRaw, ...topRaw]) {
+  // Merge collaboration tracks first (Iraaday, Bikhra, etc.) then primary tracks
+  for (const s of [...relatedSongsRaw, ...primaryRaw]) {
     if (s?.id && !seen.has(s.id)) {
-      seen.add(s.id);
-      allTracks.push(mapSaavnTrack(s));
+      if (isSongByArtist(s, artist.name, rawId)) {
+        seen.add(s.id);
+        allTracks.push(mapSaavnTrack(s));
+      }
     }
   }
-
-  // Sort by playCount descending so the biggest hits appear at the top
-  allTracks.sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0));
 
   // If artist image is generic placeholder, use artwork from the artist's top hit
   if (!artist.image || artist.image.includes("share-image") || artist.image.includes("artist-default")) {
