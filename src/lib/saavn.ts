@@ -69,7 +69,12 @@ async function callSaavn<T = any>(params: Record<string, string | number>): Prom
   try {
     const res = await fetch(url.toString(), {
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9,hi;q=0.8,ur;q=0.7",
+        Cookie: "L=hindi%2Curdu%2Cpunjabi%2Cenglish; gdpr_acceptance=true; DL=english",
+        Referer: "https://www.jiosaavn.com/",
       },
       signal: controller.signal,
       cache: "no-store",
@@ -199,8 +204,17 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export function isSongByArtist(song: any, artistName: string, artistId: string): boolean {
+export function isSongByArtist(song: any, artistName: string, artistId: string, dominantLanguage?: string): boolean {
   if (!song) return false;
+
+  // Filter out songs from completely different languages if the artist has an established dominant language
+  // e.g. Pakistani pop singer (dominant: "hindi" or "urdu") having erroneously merged Bangladeshi songs ("bengali")
+  const songLang = String(song.language || "").toLowerCase().trim();
+  const domLang = String(dominantLanguage || "").toLowerCase().trim();
+  if ((domLang === "hindi" || domLang === "urdu") && songLang === "bengali") {
+    return false;
+  }
+
   const info = song.more_info || {};
   const artistMap = info.artistMap || {};
   const performers = [
@@ -318,13 +332,15 @@ export async function getSaavnArtist(artistIdWithPrefix: string): Promise<Artist
     const matchingProfiles = (artistSearch?.results || []).filter((a: any) => {
       const aId = String(a.id || "").trim();
       if (aId === rawId) return false;
-      const aName = normalizeArtistText(a.name || "");
-      return targetRegex.test(aName);
+      const aName = a.name || "";
+      const isCollab = /[&,]|(\band\b)|(\bfeat\b)|(\bft\b)/i.test(aName);
+      if (!isCollab) return false;
+      return targetRegex.test(normalizeArtistText(aName));
     });
 
     if (matchingProfiles.length > 0) {
       const relatedDetails = await Promise.all(
-        matchingProfiles.slice(0, 5).map((p: any) =>
+        matchingProfiles.slice(0, 4).map((p: any) =>
           callSaavn<any>({
             __call: "artist.getArtistPageDetails",
             artistId: p.id,
@@ -345,16 +361,20 @@ export async function getSaavnArtist(artistIdWithPrefix: string): Promise<Artist
 
   const seen = new Set<string>();
   const allTracks: Track[] = [];
+  const domLang = details.dominantLanguage || details.language;
 
   // Merge collaboration tracks first (Iraaday, Bikhra, etc.) then primary tracks
   for (const s of [...relatedSongsRaw, ...primaryRaw]) {
     if (s?.id && !seen.has(s.id)) {
-      if (isSongByArtist(s, artist.name, rawId)) {
+      if (isSongByArtist(s, artist.name, rawId, domLang)) {
         seen.add(s.id);
         allTracks.push(mapSaavnTrack(s));
       }
     }
   }
+
+  // Sort by playCount descending so biggest hits appear at the top
+  allTracks.sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0));
 
   // If artist image is generic placeholder, use artwork from the artist's top hit
   if (!artist.image || artist.image.includes("share-image") || artist.image.includes("artist-default")) {
