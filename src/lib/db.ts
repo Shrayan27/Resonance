@@ -34,8 +34,12 @@ interface DatabaseSchema {
   sessions: Session[];
 }
 
-const DB_DIR = path.join(process.cwd(), "data");
+const DB_DIR = process.env.VERCEL
+  ? path.join("/tmp", "resonance-data")
+  : path.join(process.cwd(), "data");
 const DB_FILE = path.join(DB_DIR, "resonance.json");
+
+let memoryFallbackDb: DatabaseSchema = { users: [], sessions: [] };
 
 const AVATAR_GRADIENTS = [
   "from-emerald-400 to-teal-600",
@@ -47,37 +51,43 @@ const AVATAR_GRADIENTS = [
 ];
 
 function ensureDb(): DatabaseSchema {
-  if (!fs.existsSync(DB_DIR)) {
-    fs.mkdirSync(DB_DIR, { recursive: true });
-  }
-
-  if (!fs.existsSync(DB_FILE)) {
-    const initial: DatabaseSchema = { users: [], sessions: [] };
-    fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2), "utf8");
-    return initial;
-  }
-
   try {
+    if (!fs.existsSync(DB_DIR)) {
+      fs.mkdirSync(DB_DIR, { recursive: true });
+    }
+
+    if (!fs.existsSync(DB_FILE)) {
+      const initial: DatabaseSchema = { users: [], sessions: [] };
+      fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2), "utf8");
+      memoryFallbackDb = initial;
+      return initial;
+    }
+
     const content = fs.readFileSync(DB_FILE, "utf8");
     const parsed = JSON.parse(content);
-    return {
+    const data: DatabaseSchema = {
       users: Array.isArray(parsed.users) ? parsed.users : [],
       sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
     };
+    memoryFallbackDb = data;
+    return data;
   } catch {
-    const fallback: DatabaseSchema = { users: [], sessions: [] };
-    fs.writeFileSync(DB_FILE, JSON.stringify(fallback, null, 2), "utf8");
-    return fallback;
+    return memoryFallbackDb;
   }
 }
 
 function saveDb(data: DatabaseSchema) {
-  if (!fs.existsSync(DB_DIR)) {
-    fs.mkdirSync(DB_DIR, { recursive: true });
+  memoryFallbackDb = data;
+  try {
+    if (!fs.existsSync(DB_DIR)) {
+      fs.mkdirSync(DB_DIR, { recursive: true });
+    }
+    const tempFile = `${DB_FILE}.tmp`;
+    fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), "utf8");
+    fs.renameSync(tempFile, DB_FILE);
+  } catch {
+    // If filesystem is read-only, in-memory state is preserved
   }
-  const tempFile = `${DB_FILE}.tmp`;
-  fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), "utf8");
-  fs.renameSync(tempFile, DB_FILE);
 }
 
 function hashPassword(password: string, salt: string): string {

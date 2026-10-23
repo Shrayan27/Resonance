@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { resolveStreamUrl } from "@/lib/audius";
 import { resolveSaavnStreamUrl } from "@/lib/saavn";
 
+export const maxDuration = 60;
+
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const decodedId = decodeURIComponent(id);
