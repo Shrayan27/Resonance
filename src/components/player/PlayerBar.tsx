@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
+  ChevronDown,
   Heart,
   ListMusic,
   Loader2,
@@ -215,6 +216,197 @@ function TrackInfo({ compact }: { compact?: boolean }) {
   );
 }
 
+function MobilePlayerModal({
+  open,
+  onClose,
+  hasTrack,
+}: {
+  open: boolean;
+  onClose: () => void;
+  hasTrack: boolean;
+}) {
+  const track = usePlayer(selectCurrentTrack);
+  const hydrated = useHydrated();
+  const shuffle = usePlayer((s) => s.shuffle);
+  const repeat = usePlayer((s) => s.repeat);
+  const panel = usePlayer((s) => s.panel);
+  const setPanel = usePlayer((s) => s.setPanel);
+  const next = usePlayer((s) => s.next);
+  const previous = usePlayer((s) => s.previous);
+  const seekBy = usePlayer((s) => s.seekBy);
+  const toggleShuffle = usePlayer((s) => s.toggleShuffle);
+  const cycleRepeat = usePlayer((s) => s.cycleRepeat);
+
+  const shuffleOn = hydrated && shuffle;
+  const repeatMode = hydrated ? repeat : "off";
+  const RepeatIcon = repeatMode === "one" ? Repeat1 : Repeat;
+  const repeatLabel = repeatMode === "off" ? "Enable repeat" : repeatMode === "all" ? "Repeat one" : "Disable repeat";
+  const active = "text-brand hover:text-brand-strong";
+  const dot = (
+    <span aria-hidden="true" className="absolute bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full bg-brand" />
+  );
+
+  if (!open || !track) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col justify-between bg-linear-to-b from-neutral-900 via-[#0a0c0e] to-black text-white p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] md:hidden overflow-y-auto animate-in slide-in-from-bottom duration-300">
+      {/* Top Header */}
+      <div className="flex items-center justify-between pb-2">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Collapse player"
+          className="grid size-10 place-items-center rounded-full text-zinc-400 hover:text-white hover:bg-white/10 active:scale-95 transition-transform"
+        >
+          <ChevronDown className="size-6" />
+        </button>
+        <div className="text-center min-w-0 px-2">
+          <p className="text-[10px] font-bold tracking-widest text-zinc-400 uppercase">Now Playing</p>
+          <p className="max-w-[200px] truncate text-xs font-semibold text-white/90">
+            {track.album || track.title}
+          </p>
+        </div>
+        <div className="size-10 flex items-center justify-center">
+          <LikeButton />
+        </div>
+      </div>
+
+      {/* Album Artwork */}
+      <div className="my-auto flex flex-col items-center justify-center py-4">
+        <div className="relative aspect-square w-full max-w-[290px] overflow-hidden rounded-2xl shadow-2xl shadow-black ring-1 ring-white/15">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={track.artworkLarge || track.artwork}
+            alt={`${track.title} artwork`}
+            className="size-full object-cover"
+          />
+        </div>
+      </div>
+
+      {/* Track Info */}
+      <div className="mt-3 flex items-center justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-xl font-bold text-white sm:text-2xl" title={track.title}>
+            {track.title}
+          </h2>
+          <Link
+            href={`/artist/${track.artist.id}`}
+            onClick={onClose}
+            className="mt-0.5 block truncate text-sm text-zinc-400 hover:text-white hover:underline"
+          >
+            {track.artist.name}
+          </Link>
+        </div>
+      </div>
+
+      {/* Seekbar */}
+      <div className="mt-4">
+        <SeekBar disabled={!hasTrack} />
+      </div>
+
+      {/* Controls */}
+      <div className="mt-2 flex items-center justify-between px-1">
+        <button
+          type="button"
+          className={cn("relative grid size-10 place-items-center text-zinc-400 transition-colors hover:text-white", shuffleOn && active)}
+          aria-label={shuffleOn ? "Disable shuffle" : "Enable shuffle"}
+          onClick={toggleShuffle}
+        >
+          <Shuffle className="size-5" />
+          {shuffleOn && dot}
+        </button>
+
+        <button
+          type="button"
+          className="grid size-11 place-items-center text-zinc-300 hover:text-white active:scale-90 transition-transform"
+          aria-label="Previous track"
+          onClick={previous}
+        >
+          <SkipBack className="size-6 fill-current" />
+        </button>
+
+        <button
+          type="button"
+          className="grid size-9 place-items-center text-zinc-400 hover:text-white active:scale-90 transition-transform"
+          aria-label="Rewind 5s"
+          onClick={() => seekBy(-5)}
+        >
+          <RotateCcw className="size-5" />
+        </button>
+
+        <PlayToggle size="lg" disabled={!hasTrack} />
+
+        <button
+          type="button"
+          className="grid size-9 place-items-center text-zinc-400 hover:text-white active:scale-90 transition-transform"
+          aria-label="Forward 5s"
+          onClick={() => seekBy(5)}
+        >
+          <RotateCw className="size-5" />
+        </button>
+
+        <button
+          type="button"
+          className="grid size-11 place-items-center text-zinc-300 hover:text-white active:scale-90 transition-transform"
+          aria-label="Next track"
+          onClick={next}
+        >
+          <SkipForward className="size-6 fill-current" />
+        </button>
+
+        <button
+          type="button"
+          className={cn("relative grid size-10 place-items-center text-zinc-400 transition-colors hover:text-white", repeatMode !== "off" && active)}
+          aria-label={repeatLabel}
+          onClick={cycleRepeat}
+        >
+          <RepeatIcon className="size-5" />
+          {repeatMode !== "off" && dot}
+        </button>
+      </div>
+
+      {/* Bottom Bar: Lyrics & Queue & Volume */}
+      <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              setPanel(panel === "lyrics" ? "none" : "lyrics");
+            }}
+            className={cn(
+              "flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors",
+              panel === "lyrics" ? "bg-brand text-brand-foreground" : "bg-white/10 text-white hover:bg-white/15",
+            )}
+          >
+            <MicVocal className="size-4" />
+            <span>Lyrics</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              setPanel(panel === "queue" ? "none" : "queue");
+            }}
+            className={cn(
+              "flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors",
+              panel === "queue" ? "bg-brand text-brand-foreground" : "bg-white/10 text-white hover:bg-white/15",
+            )}
+          >
+            <ListMusic className="size-4" />
+            <span>Queue</span>
+          </button>
+        </div>
+
+        <div className="scale-90 origin-right">
+          <VolumeControl />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function PlayerBar() {
   const hydrated = useHydrated();
   const hasTrack = usePlayer((s) => s.index >= 0);
@@ -229,6 +421,7 @@ export function PlayerBar() {
   const cycleRepeat = usePlayer((s) => s.cycleRepeat);
   const setPanel = usePlayer((s) => s.setPanel);
   const progress = usePlayer((s) => (s.duration > 0 ? s.position / s.duration : 0));
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const shuffleOn = hydrated && shuffle;
   const repeatMode = hydrated ? repeat : "off";
@@ -241,9 +434,10 @@ export function PlayerBar() {
 
   return (
     <TooltipProvider delay={400}>
+      <MobilePlayerModal open={mobileOpen} onClose={() => setMobileOpen(false)} hasTrack={hasTrack} />
       <footer
         aria-label="Player"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#0b0c0e]/95 text-white backdrop-blur-md"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#0b0c0e]/95 text-white backdrop-blur-md pb-[env(safe-area-inset-bottom,0px)]"
       >
         {error && (
           <div
@@ -262,9 +456,14 @@ export function PlayerBar() {
             />
           </div>
           <div className="flex h-16 items-center gap-2 px-3">
-            <div className="min-w-0 flex-1">
+            <button
+              type="button"
+              className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none"
+              onClick={() => hasTrack && setMobileOpen(true)}
+              aria-label="Open full screen player"
+            >
               <TrackInfo compact />
-            </div>
+            </button>
             <LikeButton />
             <Tip label="Lyrics">
               <button

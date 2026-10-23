@@ -128,8 +128,10 @@ export function Sidebar() {
   return (
     <aside
       aria-label="Your Library"
-      style={{ width: collapsed ? 72 : 300 }}
-      className="hidden min-h-0 shrink-0 flex-col overflow-hidden rounded-lg bg-panel transition-[width] duration-200 md:flex"
+      className={cn(
+        "hidden min-h-0 shrink-0 flex-col overflow-hidden rounded-lg bg-panel transition-[width] duration-200 md:flex",
+        collapsed ? "w-[72px]" : "w-[240px] lg:w-[280px] xl:w-[300px]",
+      )}
     >
       <div className={cn("flex items-center gap-1 p-3 pb-2", collapsed ? "flex-col" : "justify-between pl-4")}>
         <button

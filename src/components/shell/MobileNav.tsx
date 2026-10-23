@@ -16,7 +16,7 @@ export function MobileNav() {
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-(--player-h) z-30 flex h-14 items-center justify-around border-t border-white/10 bg-black/90 backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-[calc(var(--player-h)+env(safe-area-inset-bottom,0px))] z-30 flex h-14 items-center justify-around border-t border-white/10 bg-black/90 backdrop-blur md:hidden"
     >
       {ITEMS.map(({ href, label, icon: Icon, match }) => {
         const active = match(pathname);
