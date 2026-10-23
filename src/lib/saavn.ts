@@ -300,14 +300,14 @@ export async function getSaavnArtist(artistIdWithPrefix: string): Promise<Artist
 
   const artist = mapSaavnArtist(details);
 
-  // 2. Fetch top songs from artist page and strictly filter out covers / other singers
+  // 2. Fetch top songs from official artist page
   const topRaw: any[] = (details.topSongs || []).filter((s: any) =>
     isSongByArtist(s, artist.name, rawId)
   );
 
-  // 3. If top songs list was empty on JioSaavn, search as fallback
+  // 3. Search for the artist name to aggregate popular hits & collaborations (e.g. Abdul Hannan & Rovalio)
   let extraSongsRaw: any[] = [];
-  if (topRaw.length === 0) {
+  try {
     const moreSongsRes = await callSaavn<{ results?: any[] }>({
       __call: "search.getResults",
       q: artist.name,
@@ -317,15 +317,29 @@ export async function getSaavnArtist(artistIdWithPrefix: string): Promise<Artist
     extraSongsRaw = (moreSongsRes?.results || []).filter((s: any) =>
       isSongByArtist(s, artist.name, rawId)
     );
+  } catch {
+    // Graceful fallback to topRaw
   }
 
   const seen = new Set<string>();
   const allTracks: Track[] = [];
 
-  for (const s of [...topRaw, ...extraSongsRaw]) {
+  // Merge search hits (which include major collaborative hits like Iraaday, Bikhra) and official artist page tracks
+  for (const s of [...extraSongsRaw, ...topRaw]) {
     if (s?.id && !seen.has(s.id)) {
       seen.add(s.id);
       allTracks.push(mapSaavnTrack(s));
+    }
+  }
+
+  // Sort by playCount descending so the biggest hits appear at the top
+  allTracks.sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0));
+
+  // If artist image is generic placeholder, use artwork from the artist's top hit
+  if (!artist.image || artist.image.includes("share-image") || artist.image.includes("artist-default")) {
+    if (allTracks[0]?.artworkLarge || allTracks[0]?.artwork) {
+      artist.image = allTracks[0].artworkLarge || allTracks[0].artwork;
+      artist.imageLarge = artist.image;
     }
   }
 
