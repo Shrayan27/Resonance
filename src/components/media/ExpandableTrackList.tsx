@@ -11,15 +11,23 @@ interface Props {
   label?: string;
   hideHeader?: boolean;
   showPlays?: boolean;
+  isSearch?: boolean;
 }
 
 /** Shows the first `initial` tracks (all of `tracks` stay the playback context) with a Show more toggle. */
-export function ExpandableTrackList({ tracks, initial = 5, label, hideHeader, showPlays }: Props) {
+export function ExpandableTrackList({ tracks, initial = 5, label, hideHeader, showPlays, isSearch }: Props) {
   const [expanded, setExpanded] = useState(false);
   const visible = expanded ? tracks : tracks.slice(0, initial);
   return (
     <div>
-      <TrackList tracks={visible} contextTracks={tracks} label={label} hideHeader={hideHeader} showPlays={showPlays} />
+      <TrackList
+        tracks={visible}
+        contextTracks={isSearch ? undefined : tracks}
+        isSearch={isSearch}
+        label={label}
+        hideHeader={hideHeader}
+        showPlays={showPlays}
+      />
       {tracks.length > initial && (
         <Button
           variant="ghost"

@@ -12,6 +12,7 @@ interface TrackListProps {
   contextTracks?: Track[];
   /** Show the plays column. Defaults to true when any track has a play count. */
   showPlays?: boolean;
+  isSearch?: boolean;
   onRemove?: (track: Track) => void;
   removeLabel?: string;
   /** Hide the column header (compact lists such as search results). */
@@ -20,7 +21,17 @@ interface TrackListProps {
   label?: string;
 }
 
-export function TrackList({ tracks, contextTracks, showPlays, onRemove, removeLabel, hideHeader, className, label = "Tracks" }: TrackListProps) {
+export function TrackList({
+  tracks,
+  contextTracks,
+  showPlays,
+  isSearch,
+  onRemove,
+  removeLabel,
+  hideHeader,
+  className,
+  label = "Tracks",
+}: TrackListProps) {
   const plays = showPlays ?? tracks.some((t) => t.playCount != null);
   return (
     <div role="table" aria-label={label} aria-rowcount={tracks.length + 1} className={className}>
@@ -28,7 +39,7 @@ export function TrackList({ tracks, contextTracks, showPlays, onRemove, removeLa
         <div
           role="row"
           className={cn(
-            "mb-1 grid h-9 items-center gap-x-3 border-b border-white/10 px-2 text-xs font-medium tracking-wider text-muted-foreground uppercase",
+            "mb-1 hidden h-9 items-center gap-x-2 sm:gap-x-3 border-b border-white/10 px-1.5 sm:px-2 text-xs font-medium tracking-wider text-muted-foreground uppercase sm:grid",
             trackGridClass(plays),
           )}
         >
@@ -44,7 +55,7 @@ export function TrackList({ tracks, contextTracks, showPlays, onRemove, removeLa
           <div role="columnheader">
             <span className="sr-only">Like</span>
           </div>
-          <div role="columnheader" className="flex justify-end">
+          <div role="columnheader" className="hidden justify-end sm:flex">
             <Clock className="size-4" aria-label="Duration" />
           </div>
           <div role="columnheader">
@@ -60,6 +71,7 @@ export function TrackList({ tracks, contextTracks, showPlays, onRemove, removeLa
             index={i}
             tracks={contextTracks ?? tracks}
             showPlays={plays}
+            isSearch={isSearch}
             onRemove={onRemove}
             removeLabel={removeLabel}
           />

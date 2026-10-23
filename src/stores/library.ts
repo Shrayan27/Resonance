@@ -6,11 +6,13 @@ import type { Collection, Track, UserPlaylist } from "@/lib/types";
 
 interface LibraryState {
   liked: Track[];
+  history: Track[];
   playlists: UserPlaylist[];
   savedCollections: Collection[];
 
   isLiked: (trackId: string) => boolean;
   toggleLike: (track: Track) => void;
+  recordPlay: (track: Track) => void;
   createPlaylist: (name: string, firstTrack?: Track) => UserPlaylist;
   renamePlaylist: (id: string, name: string) => void;
   deletePlaylist: (id: string) => void;
@@ -26,6 +28,7 @@ export const useLibrary = create<LibraryState>()(
   persist(
     (set, get) => ({
       liked: [],
+      history: [],
       playlists: [],
       savedCollections: [],
 
@@ -36,6 +39,16 @@ export const useLibrary = create<LibraryState>()(
             ? s.liked.filter((t) => t.id !== track.id)
             : [track, ...s.liked],
         })),
+      recordPlay: (track) => {
+        if (typeof window !== "undefined") {
+          import("./auth").then((m) => m.useAuth.getState().recordListen(track));
+        }
+        set((s) => {
+          const prev = s.history || [];
+          const filtered = prev.filter((t) => t.id !== track.id);
+          return { history: [track, ...filtered].slice(0, 50) };
+        });
+      },
       createPlaylist: (name, firstTrack) => {
         const pl: UserPlaylist = {
           id: uid(),

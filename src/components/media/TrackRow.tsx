@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { memo, useRef } from "react";
-import { Heart, ListEnd, ListPlus, ListStart, MoreHorizontal, Pause, Play, Trash2 } from "lucide-react";
+import { Heart, ListEnd, ListPlus, ListStart, MoreHorizontal, Pause, Play, Trash2, User } from "lucide-react";
 import { AddToPlaylistMenu } from "@/components/shell/AddToPlaylistMenu";
 import {
   DropdownMenu,
@@ -22,8 +22,8 @@ import { Equalizer } from "./Equalizer";
 
 export function trackGridClass(showPlays: boolean) {
   return showPlays
-    ? "grid-cols-[2rem_minmax(0,1fr)_2rem_3rem_2rem] md:grid-cols-[2rem_minmax(0,1fr)_6rem_2rem_3rem_2rem]"
-    : "grid-cols-[2rem_minmax(0,1fr)_2rem_3rem_2rem]";
+    ? "grid-cols-[1.75rem_minmax(0,1fr)_2rem_2rem] sm:grid-cols-[2rem_minmax(0,1fr)_2rem_3rem_2rem] md:grid-cols-[2rem_minmax(0,1fr)_6rem_2rem_3rem_2rem]"
+    : "grid-cols-[1.75rem_minmax(0,1fr)_2rem_2rem] sm:grid-cols-[2rem_minmax(0,1fr)_2rem_3rem_2rem]";
 }
 
 interface TrackRowProps {
@@ -32,35 +32,42 @@ interface TrackRowProps {
   /** The list this row belongs to; becomes the queue when played. */
   tracks: Track[];
   showPlays?: boolean;
+  isSearch?: boolean;
   /** Provide to show a "Remove" menu item (user playlists). */
   onRemove?: (track: Track) => void;
   removeLabel?: string;
 }
 
-function TrackRowImpl({ track, index, tracks, showPlays = false, onRemove, removeLabel = "Remove from playlist" }: TrackRowProps) {
+function TrackRowImpl({ track, index, tracks, showPlays = false, isSearch = false, onRemove, removeLabel = "Remove from playlist" }: TrackRowProps) {
   const hydrated = useHydrated();
   const isCurrent = usePlayer((s) => selectCurrentTrack(s)?.id === track.id);
   const isPlaying = usePlayer((s) => s.isPlaying);
   const playTrack = usePlayer((s) => s.playTrack);
+  const playTrackWithSmartQueue = usePlayer((s) => s.playTrackWithSmartQueue);
   const toggle = usePlayer((s) => s.toggle);
   const enqueue = usePlayer((s) => s.enqueue);
   const playNext = usePlayer((s) => s.playNext);
+  const openArtistPanel = usePlayer((s) => s.openArtistPanel);
   const liked = useLibrary((s) => s.liked.some((t) => t.id === track.id));
   const toggleLike = useLibrary((s) => s.toggleLike);
   const playlistTrigger = useRef<HTMLButtonElement>(null);
 
   const playing = isCurrent && isPlaying;
   const isLiked = hydrated && liked;
-  const play = () => (isCurrent ? toggle() : playTrack(track, tracks));
+  const play = () => {
+    if (isCurrent) return toggle();
+    if (isSearch) return playTrackWithSmartQueue(track);
+    playTrack(track, tracks);
+  };
 
   return (
     <div
       role="row"
       aria-label={`${track.title} by ${track.artist.name}`}
       data-current={isCurrent || undefined}
-      onDoubleClick={() => playTrack(track, tracks)}
+      onDoubleClick={() => (isSearch ? playTrackWithSmartQueue(track) : playTrack(track, tracks))}
       className={cn(
-        "group/row grid h-14 items-center gap-x-3 rounded-md px-2 text-sm transition-colors hover:bg-white/8 focus-within:bg-white/8",
+        "group/row grid h-14 items-center gap-x-2 sm:gap-x-3 rounded-md px-1.5 sm:px-2 text-sm transition-colors hover:bg-white/8 focus-within:bg-white/8",
         trackGridClass(showPlays),
       )}
     >
@@ -124,7 +131,7 @@ function TrackRowImpl({ track, index, tracks, showPlays = false, onRemove, remov
         </button>
       </div>
 
-      <div role="cell" className="text-right text-[13px] text-muted-foreground tabular-nums">
+      <div role="cell" className="hidden text-right text-[13px] text-muted-foreground tabular-nums sm:block">
         {formatTime(track.durationSec)}
       </div>
 
@@ -149,6 +156,12 @@ function TrackRowImpl({ track, index, tracks, showPlays = false, onRemove, remov
               onClick={() => setTimeout(() => playlistTrigger.current?.click(), 60)}
             >
               <ListPlus /> Add to playlist
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="gap-2 py-2"
+              onClick={() => openArtistPanel(track.artist)}
+            >
+              <User /> View artist alongside
             </DropdownMenuItem>
             {onRemove && (
               <>

@@ -164,8 +164,8 @@ flowchart TD
 | Shortcut | Action |
 | :--- | :--- |
 | <kbd>Space</kbd> / <kbd>MediaPlayPause</kbd> | Toggle Play / Pause |
-| <kbd>→</kbd> | Seek Forward 5 seconds |
-| <kbd>←</kbd> | Seek Backward 5 seconds |
+| <kbd>→</kbd> / <kbd>L</kbd> | Seek Forward 5 seconds (or Player Bar button) |
+| <kbd>←</kbd> / <kbd>J</kbd> | Seek Backward 5 seconds (or Player Bar button) |
 | <kbd>↑</kbd> | Volume Up (+5%) |
 | <kbd>↓</kbd> | Volume Down (-5%) |
 | <kbd>M</kbd> | Toggle Mute |

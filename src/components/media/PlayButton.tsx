@@ -1,7 +1,7 @@
 "use client";
 
 import { Pause, Play } from "lucide-react";
-import { usePlayer } from "@/stores/player";
+import { selectCurrentTrack, usePlayer } from "@/stores/player";
 import type { Track } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -22,10 +22,12 @@ interface PlayButtonProps {
 
 /** Big round accent button: plays `tracks`, or toggles playback when they're already the active queue. */
 export function PlayButton({ tracks, label, size = "lg", className }: PlayButtonProps) {
-  const active = usePlayer((s) => sameTrackList(s.queue, tracks));
+  const currentTrack = usePlayer(selectCurrentTrack);
+  const queue = usePlayer((s) => s.queue);
   const isPlaying = usePlayer((s) => s.isPlaying);
   const playQueue = usePlayer((s) => s.playQueue);
   const toggle = usePlayer((s) => s.toggle);
+  const active = sameTrackList(queue, tracks) || (currentTrack ? tracks.some((t) => t.id === currentTrack.id) : false);
   const playing = active && isPlaying;
   const empty = tracks.length === 0;
 
