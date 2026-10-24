@@ -18,6 +18,8 @@ import { useAuth } from "@/stores/auth";
 import { useLibrary } from "@/stores/library";
 import { THEMES, useTheme } from "@/stores/theme";
 import { Logo } from "./Logo";
+import { RecentSearchesDropdown } from "@/components/search/RecentSearchesDropdown";
+import { useRecentSearches, type RecentSearchItem } from "@/stores/recent-searches";
 
 function SearchBox() {
   const router = useRouter();
@@ -25,10 +27,13 @@ function SearchBox() {
   const params = useSearchParams();
   const urlQuery = pathname === "/search" ? (params.get("q") ?? "") : "";
   const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLFormElement>(null);
   const [value, setValue] = useState(urlQuery);
+  const [isFocused, setIsFocused] = useState(false);
   const [syncedUrlQuery, setSyncedUrlQuery] = useState(urlQuery);
   const [lastSent, setLastSent] = useState(urlQuery);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const addSearch = useRecentSearches((s) => s.addSearch);
 
   if (urlQuery !== syncedUrlQuery) {
     setSyncedUrlQuery(urlQuery);
@@ -46,6 +51,7 @@ function SearchBox() {
       if (pathname === "/search") router.replace("/search");
       return;
     }
+    addSearch(trimmed);
     router.replace(`/search?q=${encodeURIComponent(trimmed)}`);
   };
 
@@ -55,7 +61,27 @@ function SearchBox() {
     timer.current = setTimeout(() => navigate(q), 300);
   };
 
+  const onSelectRecent = (item: RecentSearchItem) => {
+    setIsFocused(false);
+    if (item.type === "query") {
+      setValue(item.query);
+      navigate(item.query);
+    } else {
+      router.push(item.targetUrl);
+    }
+  };
+
   useEffect(() => () => clearTimeout(timer.current), []);
+
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsFocused(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -65,9 +91,11 @@ function SearchBox() {
         e.preventDefault();
         inputRef.current?.focus();
         inputRef.current?.select();
+        setIsFocused(true);
       } else if (e.key === "/" && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
         inputRef.current?.focus();
+        setIsFocused(true);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -83,10 +111,16 @@ function SearchBox() {
 
   return (
     <form
+      ref={containerRef}
       role="search"
       onSubmit={(e) => {
         e.preventDefault();
         clearTimeout(timer.current);
+        const trimmed = value.trim();
+        if (trimmed) {
+          addSearch(trimmed);
+        }
+        setIsFocused(false);
         navigate(value);
       }}
       className="group relative w-full max-w-[460px]"
@@ -97,8 +131,15 @@ function SearchBox() {
         type="text"
         inputMode="search"
         value={value}
+        onFocus={() => setIsFocused(true)}
         onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => e.key === "Escape" && (value ? clear() : e.currentTarget.blur())}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            setIsFocused(false);
+            if (value) clear();
+            else e.currentTarget.blur();
+          }
+        }}
         placeholder="What do you want to play?"
         aria-label="Search"
         autoComplete="off"
@@ -119,6 +160,13 @@ function SearchBox() {
           Ctrl K
         </kbd>
       )}
+
+      <RecentSearchesDropdown
+        isOpen={isFocused}
+        filterText={value}
+        onSelect={onSelectRecent}
+        onClose={() => setIsFocused(false)}
+      />
     </form>
   );
 }

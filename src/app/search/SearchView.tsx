@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { SearchX } from "lucide-react";
@@ -9,18 +10,34 @@ import { EmptyState, ErrorState } from "@/components/media/ErrorState";
 import { ExpandableTrackList } from "@/components/media/ExpandableTrackList";
 import { CardPlayButton, CollectionCard } from "@/components/media/MediaCard";
 import { Shelf } from "@/components/media/Shelf";
+import { RecentSearchesShelf } from "@/components/search/RecentSearchesShelf";
 import { fetchArtist, fetchCollection, useSearch } from "@/lib/api";
 import { formatCount } from "@/lib/format";
 import type { SearchResults } from "@/lib/types";
 import { selectCurrentTrack, usePlayer } from "@/stores/player";
+import { useRecentSearches } from "@/stores/recent-searches";
 import { BrowseGrid } from "./BrowseGrid";
 import { SearchSkeleton } from "./SearchSkeleton";
 
 export function SearchView() {
   const q = (useSearchParams().get("q") ?? "").trim();
   const { data, error, loading, retry } = useSearch(q);
+  const addSearch = useRecentSearches((s) => s.addSearch);
 
-  if (!q) return <BrowseGrid />;
+  useEffect(() => {
+    if (q) {
+      addSearch(q);
+    }
+  }, [q, addSearch]);
+
+  if (!q) {
+    return (
+      <div className="space-y-10 pb-10">
+        <RecentSearchesShelf />
+        <BrowseGrid />
+      </div>
+    );
+  }
   if (loading) return <SearchSkeleton />;
   if (error) return <ErrorState title="Search failed" message="We couldn't reach the catalog. Try again in a moment." onRetry={retry} />;
   if (!data) return null;
@@ -65,14 +82,42 @@ export function SearchView() {
       {data.artists.length > 0 && (
         <Shelf title="Artists">
           {data.artists.map((a) => (
-            <ArtistCard key={a.id} artist={a} />
+            <ArtistCard
+              key={a.id}
+              artist={a}
+              onClick={() =>
+                addSearch({
+                  id: `artist:${a.id}`,
+                  type: "artist",
+                  query: a.name,
+                  title: a.name,
+                  subtitle: "Artist",
+                  image: a.imageLarge || a.image,
+                  targetUrl: `/artist/${a.id}`,
+                })
+              }
+            />
           ))}
         </Shelf>
       )}
       {data.playlists.length > 0 && (
         <Shelf title="Playlists">
           {data.playlists.map((c) => (
-            <CollectionCard key={c.id} collection={c} />
+            <CollectionCard
+              key={c.id}
+              collection={c}
+              onClick={() =>
+                addSearch({
+                  id: `playlist:${c.id}`,
+                  type: "playlist",
+                  query: c.title,
+                  title: c.title,
+                  subtitle: "Playlist",
+                  image: c.artworkLarge || c.artwork,
+                  targetUrl: `/playlist/${c.id}`,
+                })
+              }
+            />
           ))}
         </Shelf>
       )}
@@ -81,6 +126,7 @@ export function SearchView() {
 }
 
 function TopResult({ data, q }: { data: SearchResults; q: string }) {
+  const addSearch = useRecentSearches((s) => s.addSearch);
   const playQueue = usePlayer((s) => s.playQueue);
   const playTrackWithSmartQueue = usePlayer((s) => s.playTrackWithSmartQueue);
   const toggle = usePlayer((s) => s.toggle);
@@ -103,11 +149,22 @@ function TopResult({ data, q }: { data: SearchResults; q: string }) {
   const openArtistPanel = usePlayer((s) => s.openArtistPanel);
 
   if (kind === "artist" && topArtist) {
+    const recordArtist = () =>
+      addSearch({
+        id: `artist:${topArtist.id}`,
+        type: "artist",
+        query: topArtist.name,
+        title: topArtist.name,
+        subtitle: "Artist",
+        image: topArtist.imageLarge || topArtist.image,
+        targetUrl: `/artist/${topArtist.id}`,
+      });
+
     return (
       <div className={shell}>
         <Artwork src={topArtist.image} round fallback="artist" className="size-24 shadow-xl shadow-black/50" />
         <div className="min-w-0 space-y-2">
-          <Link href={`/artist/${topArtist.id}`} className={`block truncate ${link}`}>
+          <Link href={`/artist/${topArtist.id}`} onClick={recordArtist} className={`block truncate ${link}`}>
             {topArtist.name}
           </Link>
           <div className="flex flex-wrap items-center gap-2">
@@ -117,6 +174,7 @@ function TopResult({ data, q }: { data: SearchResults; q: string }) {
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
+                recordArtist();
                 openArtistPanel({ id: topArtist.id, name: topArtist.name });
               }}
               className="relative z-20 rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-white/20"
@@ -128,6 +186,7 @@ function TopResult({ data, q }: { data: SearchResults; q: string }) {
         <CardPlayButton
           label={`Play top tracks by ${topArtist.name}`}
           onPlay={async () => {
+            recordArtist();
             const detail = await fetchArtist(topArtist.id);
             if (detail.topTracks.length) playQueue(detail.topTracks, 0);
           }}
@@ -139,8 +198,19 @@ function TopResult({ data, q }: { data: SearchResults; q: string }) {
 
   if (kind === "track" && firstTrack) {
     const playing = isCurrent && isPlaying;
+    const recordTrack = () =>
+      addSearch({
+        id: `track:${firstTrack.id}`,
+        type: "track",
+        query: firstTrack.title,
+        title: firstTrack.title,
+        subtitle: `Song • ${firstTrack.artist.name}`,
+        image: firstTrack.artworkLarge || firstTrack.artwork,
+        targetUrl: `/search?q=${encodeURIComponent(firstTrack.title)}`,
+      });
+
     return (
-      <div className={shell}>
+      <div className={shell} onClick={recordTrack}>
         <Artwork src={firstTrack.artwork} className="size-24 shadow-xl shadow-black/50" />
         <div className="min-w-0 space-y-2">
           <div className={`truncate ${heading}`}>
@@ -150,6 +220,17 @@ function TopResult({ data, q }: { data: SearchResults; q: string }) {
             <span className={pill}>Song</span>
             <Link
               href={`/artist/${firstTrack.artist.id}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                addSearch({
+                  id: `artist:${firstTrack.artist.id}`,
+                  type: "artist",
+                  query: firstTrack.artist.name,
+                  title: firstTrack.artist.name,
+                  subtitle: "Artist",
+                  targetUrl: `/artist/${firstTrack.artist.id}`,
+                });
+              }}
               className="relative z-20 truncate text-sm text-muted-foreground hover:text-foreground hover:underline"
             >
               {firstTrack.artist.name}
@@ -159,7 +240,11 @@ function TopResult({ data, q }: { data: SearchResults; q: string }) {
         <CardPlayButton
           label={`${playing ? "Pause" : "Play"} ${firstTrack.title}`}
           playing={playing}
-          onPlay={() => (isCurrent ? toggle() : playTrackWithSmartQueue(firstTrack))}
+          onPlay={() => {
+            recordTrack();
+            if (isCurrent) toggle();
+            else playTrackWithSmartQueue(firstTrack);
+          }}
           className="right-5 bottom-5"
         />
       </div>
@@ -167,11 +252,22 @@ function TopResult({ data, q }: { data: SearchResults; q: string }) {
   }
 
   if (playlist) {
+    const recordPlaylist = () =>
+      addSearch({
+        id: `playlist:${playlist.id}`,
+        type: "playlist",
+        query: playlist.title,
+        title: playlist.title,
+        subtitle: "Playlist",
+        image: playlist.artworkLarge || playlist.artwork,
+        targetUrl: `/playlist/${playlist.id}`,
+      });
+
     return (
       <div className={shell}>
         <Artwork src={playlist.artwork} className="size-24 shadow-xl shadow-black/50" />
         <div className="min-w-0 space-y-2">
-          <Link href={`/playlist/${playlist.id}`} className={`block truncate ${link}`}>
+          <Link href={`/playlist/${playlist.id}`} onClick={recordPlaylist} className={`block truncate ${link}`}>
             {playlist.title}
           </Link>
           <div className="flex items-center gap-2">
@@ -182,6 +278,7 @@ function TopResult({ data, q }: { data: SearchResults; q: string }) {
         <CardPlayButton
           label={`Play ${playlist.title}`}
           onPlay={async () => {
+            recordPlaylist();
             const detail = await fetchCollection(playlist.id);
             if (detail.tracks.length) playQueue(detail.tracks, 0);
           }}

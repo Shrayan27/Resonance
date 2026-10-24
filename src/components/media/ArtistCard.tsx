@@ -5,7 +5,7 @@ import { fetchArtist } from "@/lib/api";
 import type { Artist } from "@/lib/types";
 import { usePlayer } from "@/stores/player";
 
-export function ArtistCard({ artist, className }: { artist: Artist; className?: string }) {
+export function ArtistCard({ artist, className, onClick }: { artist: Artist; className?: string; onClick?: () => void }) {
   const playQueue = usePlayer((s) => s.playQueue);
   return (
     <MediaCard
@@ -16,7 +16,9 @@ export function ArtistCard({ artist, className }: { artist: Artist; className?: 
       href={`/artist/${artist.id}`}
       image={artist.image}
       playLabel={`top tracks by ${artist.name}`}
+      onClick={onClick}
       onPlay={async () => {
+        onClick?.();
         const detail = await fetchArtist(artist.id);
         if (detail.topTracks.length) playQueue(detail.topTracks, 0);
       }}

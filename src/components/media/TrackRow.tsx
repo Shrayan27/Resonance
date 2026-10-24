@@ -16,6 +16,7 @@ import type { Track } from "@/lib/types";
 import { useHydrated } from "@/lib/use-hydrated";
 import { cn } from "@/lib/utils";
 import { useLibrary } from "@/stores/library";
+import { useRecentSearches } from "@/stores/recent-searches";
 import { selectCurrentTrack, usePlayer } from "@/stores/player";
 import { Artwork } from "./Artwork";
 import { Equalizer } from "./Equalizer";
@@ -56,7 +57,18 @@ function TrackRowImpl({ track, index, tracks, showPlays = false, isSearch = fals
   const isLiked = hydrated && liked;
   const play = () => {
     if (isCurrent) return toggle();
-    if (isSearch) return playTrackWithSmartQueue(track);
+    if (isSearch) {
+      useRecentSearches.getState().addSearch({
+        id: `track:${track.id}`,
+        type: "track",
+        query: track.title,
+        title: track.title,
+        subtitle: `Song • ${track.artist.name}`,
+        image: track.artworkLarge || track.artwork,
+        targetUrl: `/search?q=${encodeURIComponent(track.title)}`,
+      });
+      return playTrackWithSmartQueue(track);
+    }
     playTrack(track, tracks);
   };
 

@@ -23,6 +23,7 @@ interface MediaCardProps {
   onPlay?: () => void | Promise<void>;
   playLabel?: string;
   className?: string;
+  onClick?: () => void;
 }
 
 export function CardPlayButton({
@@ -81,6 +82,7 @@ export function MediaCard({
   onPlay,
   playLabel,
   className,
+  onClick,
 }: MediaCardProps) {
   const titleClass = cn(
     "block truncate text-left text-sm font-semibold outline-none",
@@ -114,7 +116,7 @@ export function MediaCard({
       </div>
       <div className="min-w-0 space-y-0.5">
         {href ? (
-          <Link href={href} className={titleClass}>
+          <Link href={href} onClick={onClick} className={titleClass}>
             {title}
           </Link>
         ) : (
@@ -157,7 +159,7 @@ export function TrackCard({ track, context, className }: { track: Track; context
 }
 
 /** Card for a playlist or album; the play button loads its tracks and starts them. */
-export function CollectionCard({ collection, className }: { collection: Collection; className?: string }) {
+export function CollectionCard({ collection, className, onClick }: { collection: Collection; className?: string; onClick?: () => void }) {
   const playQueue = usePlayer((s) => s.playQueue);
   return (
     <MediaCard
@@ -166,7 +168,9 @@ export function CollectionCard({ collection, className }: { collection: Collecti
       href={`/playlist/${collection.id}`}
       image={collection.artwork}
       playLabel={collection.title}
+      onClick={onClick}
       onPlay={async () => {
+        onClick?.();
         const detail = await fetchCollection(collection.id);
         if (detail.tracks.length) playQueue(detail.tracks, 0);
       }}
