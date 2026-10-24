@@ -75,6 +75,9 @@ async function callSaavn<T = any>(params: Record<string, string | number>): Prom
         "Accept-Language": "en-US,en;q=0.9,hi;q=0.8,ur;q=0.7",
         Cookie: "L=hindi%2Curdu%2Cpunjabi%2Cenglish; gdpr_acceptance=true; DL=english",
         Referer: "https://www.jiosaavn.com/",
+        "X-Forwarded-For": "103.250.144.1",
+        "CF-Connecting-IP": "103.250.144.1",
+        "True-Client-IP": "103.250.144.1",
       },
       signal: controller.signal,
       cache: "no-store",
@@ -373,8 +376,7 @@ export async function getSaavnArtist(artistIdWithPrefix: string): Promise<Artist
     }
   }
 
-  // Sort by playCount descending so biggest hits appear at the top
-  allTracks.sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0));
+  // Natural order: collaboration hits first, then primary artist curated top hits
 
   // If artist image is generic placeholder, use artwork from the artist's top hit
   if (!artist.image || artist.image.includes("share-image") || artist.image.includes("artist-default")) {
