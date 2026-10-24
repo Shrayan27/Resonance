@@ -19,7 +19,8 @@ import { useLibrary } from "@/stores/library";
 import { THEMES, useTheme } from "@/stores/theme";
 import { Logo } from "./Logo";
 import { RecentSearchesDropdown } from "@/components/search/RecentSearchesDropdown";
-import { useRecentSearches, type RecentSearchItem } from "@/stores/recent-searches";
+import { type RecentSearchItem } from "@/stores/recent-searches";
+import { selectCurrentTrack, usePlayer } from "@/stores/player";
 
 function SearchBox() {
   const router = useRouter();
@@ -33,7 +34,10 @@ function SearchBox() {
   const [syncedUrlQuery, setSyncedUrlQuery] = useState(urlQuery);
   const [lastSent, setLastSent] = useState(urlQuery);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const addSearch = useRecentSearches((s) => s.addSearch);
+
+  const playTrackWithSmartQueue = usePlayer((s) => s.playTrackWithSmartQueue);
+  const toggle = usePlayer((s) => s.toggle);
+  const currentTrack = usePlayer(selectCurrentTrack);
 
   if (urlQuery !== syncedUrlQuery) {
     setSyncedUrlQuery(urlQuery);
@@ -51,7 +55,6 @@ function SearchBox() {
       if (pathname === "/search") router.replace("/search");
       return;
     }
-    addSearch(trimmed);
     router.replace(`/search?q=${encodeURIComponent(trimmed)}`);
   };
 
@@ -63,12 +66,15 @@ function SearchBox() {
 
   const onSelectRecent = (item: RecentSearchItem) => {
     setIsFocused(false);
-    if (item.type === "query") {
-      setValue(item.query);
-      navigate(item.query);
-    } else {
-      router.push(item.targetUrl);
+    if (item.type === "track" && item.trackData) {
+      if (currentTrack?.id === item.trackData.id) {
+        toggle();
+      } else {
+        playTrackWithSmartQueue(item.trackData);
+      }
+      return;
     }
+    router.push(item.targetUrl);
   };
 
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -116,10 +122,6 @@ function SearchBox() {
       onSubmit={(e) => {
         e.preventDefault();
         clearTimeout(timer.current);
-        const trimmed = value.trim();
-        if (trimmed) {
-          addSearch(trimmed);
-        }
         setIsFocused(false);
         navigate(value);
       }}

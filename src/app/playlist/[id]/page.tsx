@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Heart } from "lucide-react";
 import { ErrorState } from "@/components/media/ErrorState";
@@ -14,6 +14,7 @@ import { formatDuration } from "@/lib/duration";
 import { useHydrated } from "@/lib/use-hydrated";
 import { cn } from "@/lib/utils";
 import { useLibrary } from "@/stores/library";
+import { useRecentSearches } from "@/stores/recent-searches";
 
 export default function PlaylistPage() {
   return (
@@ -30,6 +31,16 @@ function PlaylistView() {
   const hydrated = useHydrated();
   const toggleSave = useLibrary((s) => s.toggleSaveCollection);
   const saved = useLibrary((s) => s.savedCollections.some((c) => c.id === id)) && hydrated;
+
+  useEffect(() => {
+    if (data?.collection) {
+      if (data.collection.kind === "album") {
+        useRecentSearches.getState().addAlbum(data.collection);
+      } else {
+        useRecentSearches.getState().addPlaylist(data.collection);
+      }
+    }
+  }, [data?.collection]);
 
   if (loading) return <PageSkeleton />;
   if (error || !data) {

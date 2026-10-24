@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { SearchX } from "lucide-react";
@@ -22,13 +21,10 @@ import { SearchSkeleton } from "./SearchSkeleton";
 export function SearchView() {
   const q = (useSearchParams().get("q") ?? "").trim();
   const { data, error, loading, retry } = useSearch(q);
-  const addSearch = useRecentSearches((s) => s.addSearch);
 
-  useEffect(() => {
-    if (q) {
-      addSearch(q);
-    }
-  }, [q, addSearch]);
+  const addArtist = useRecentSearches((s) => s.addArtist);
+  const addAlbum = useRecentSearches((s) => s.addAlbum);
+  const addPlaylist = useRecentSearches((s) => s.addPlaylist);
 
   if (!q) {
     return (
@@ -85,17 +81,7 @@ export function SearchView() {
             <ArtistCard
               key={a.id}
               artist={a}
-              onClick={() =>
-                addSearch({
-                  id: `artist:${a.id}`,
-                  type: "artist",
-                  query: a.name,
-                  title: a.name,
-                  subtitle: "Artist",
-                  image: a.imageLarge || a.image,
-                  targetUrl: `/artist/${a.id}`,
-                })
-              }
+              onClick={() => addArtist(a)}
             />
           ))}
         </Shelf>
@@ -106,17 +92,7 @@ export function SearchView() {
             <CollectionCard
               key={c.id}
               collection={c}
-              onClick={() =>
-                addSearch({
-                  id: `playlist:${c.id}`,
-                  type: "playlist",
-                  query: c.title,
-                  title: c.title,
-                  subtitle: "Playlist",
-                  image: c.artworkLarge || c.artwork,
-                  targetUrl: `/playlist/${c.id}`,
-                })
-              }
+              onClick={() => (c.kind === "album" ? addAlbum(c) : addPlaylist(c))}
             />
           ))}
         </Shelf>
@@ -126,7 +102,11 @@ export function SearchView() {
 }
 
 function TopResult({ data, q }: { data: SearchResults; q: string }) {
-  const addSearch = useRecentSearches((s) => s.addSearch);
+  const addArtist = useRecentSearches((s) => s.addArtist);
+  const addTrack = useRecentSearches((s) => s.addTrack);
+  const addAlbum = useRecentSearches((s) => s.addAlbum);
+  const addPlaylist = useRecentSearches((s) => s.addPlaylist);
+
   const playQueue = usePlayer((s) => s.playQueue);
   const playTrackWithSmartQueue = usePlayer((s) => s.playTrackWithSmartQueue);
   const toggle = usePlayer((s) => s.toggle);
@@ -149,16 +129,7 @@ function TopResult({ data, q }: { data: SearchResults; q: string }) {
   const openArtistPanel = usePlayer((s) => s.openArtistPanel);
 
   if (kind === "artist" && topArtist) {
-    const recordArtist = () =>
-      addSearch({
-        id: `artist:${topArtist.id}`,
-        type: "artist",
-        query: topArtist.name,
-        title: topArtist.name,
-        subtitle: "Artist",
-        image: topArtist.imageLarge || topArtist.image,
-        targetUrl: `/artist/${topArtist.id}`,
-      });
+    const recordArtist = () => addArtist(topArtist);
 
     return (
       <div className={shell}>
@@ -198,16 +169,7 @@ function TopResult({ data, q }: { data: SearchResults; q: string }) {
 
   if (kind === "track" && firstTrack) {
     const playing = isCurrent && isPlaying;
-    const recordTrack = () =>
-      addSearch({
-        id: `track:${firstTrack.id}`,
-        type: "track",
-        query: firstTrack.title,
-        title: firstTrack.title,
-        subtitle: `Song • ${firstTrack.artist.name}`,
-        image: firstTrack.artworkLarge || firstTrack.artwork,
-        targetUrl: `/search?q=${encodeURIComponent(firstTrack.title)}`,
-      });
+    const recordTrack = () => addTrack(firstTrack);
 
     return (
       <div className={shell} onClick={recordTrack}>
@@ -222,14 +184,7 @@ function TopResult({ data, q }: { data: SearchResults; q: string }) {
               href={`/artist/${firstTrack.artist.id}`}
               onClick={(e) => {
                 e.stopPropagation();
-                addSearch({
-                  id: `artist:${firstTrack.artist.id}`,
-                  type: "artist",
-                  query: firstTrack.artist.name,
-                  title: firstTrack.artist.name,
-                  subtitle: "Artist",
-                  targetUrl: `/artist/${firstTrack.artist.id}`,
-                });
+                addArtist(firstTrack.artist);
               }}
               className="relative z-20 truncate text-sm text-muted-foreground hover:text-foreground hover:underline"
             >
@@ -253,15 +208,7 @@ function TopResult({ data, q }: { data: SearchResults; q: string }) {
 
   if (playlist) {
     const recordPlaylist = () =>
-      addSearch({
-        id: `playlist:${playlist.id}`,
-        type: "playlist",
-        query: playlist.title,
-        title: playlist.title,
-        subtitle: "Playlist",
-        image: playlist.artworkLarge || playlist.artwork,
-        targetUrl: `/playlist/${playlist.id}`,
-      });
+      playlist.kind === "album" ? addAlbum(playlist) : addPlaylist(playlist);
 
     return (
       <div className={shell}>
@@ -271,7 +218,7 @@ function TopResult({ data, q }: { data: SearchResults; q: string }) {
             {playlist.title}
           </Link>
           <div className="flex items-center gap-2">
-            <span className={pill}>Playlist</span>
+            <span className={pill}>{playlist.kind === "album" ? "Album" : "Playlist"}</span>
             <span className="truncate text-sm text-muted-foreground">{playlist.owner.name}</span>
           </div>
         </div>

@@ -42,6 +42,7 @@ export const useLibrary = create<LibraryState>()(
       recordPlay: (track) => {
         if (typeof window !== "undefined") {
           import("./auth").then((m) => m.useAuth.getState().recordListen(track));
+          import("./recent-searches").then((m) => m.useRecentSearches.getState().addTrack(track));
         }
         set((s) => {
           const prev = s.history || [];

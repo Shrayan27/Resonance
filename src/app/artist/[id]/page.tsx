@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { PanelRight, Search } from "lucide-react";
 import { ErrorState } from "@/components/media/ErrorState";
@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useArtist } from "@/lib/api";
 import { formatCount } from "@/lib/format";
 import { usePlayer } from "@/stores/player";
+import { useRecentSearches } from "@/stores/recent-searches";
 import { cn } from "@/lib/utils";
 
 export default function ArtistPage() {
@@ -28,6 +29,12 @@ function ArtistView() {
   const params = useParams<{ id: string }>();
   const { data, error, loading, retry } = useArtist(params?.id);
   const openArtistPanel = usePlayer((s) => s.openArtistPanel);
+
+  useEffect(() => {
+    if (data?.artist) {
+      useRecentSearches.getState().addArtist(data.artist);
+    }
+  }, [data?.artist]);
 
   const [activeTab, setActiveTab] = useState<"popular" | "all">("popular");
   const [songQuery, setSongQuery] = useState("");

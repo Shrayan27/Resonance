@@ -58,17 +58,10 @@ function TrackRowImpl({ track, index, tracks, showPlays = false, isSearch = fals
   const play = () => {
     if (isCurrent) return toggle();
     if (isSearch) {
-      useRecentSearches.getState().addSearch({
-        id: `track:${track.id}`,
-        type: "track",
-        query: track.title,
-        title: track.title,
-        subtitle: `Song • ${track.artist.name}`,
-        image: track.artworkLarge || track.artwork,
-        targetUrl: `/search?q=${encodeURIComponent(track.title)}`,
-      });
+      useRecentSearches.getState().addTrack(track);
       return playTrackWithSmartQueue(track);
     }
+    useRecentSearches.getState().addTrack(track);
     playTrack(track, tracks);
   };
 
