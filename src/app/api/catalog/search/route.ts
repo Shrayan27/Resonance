@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     const trackIds = new Set<string>();
     const combinedTracks = [];
     for (const t of [...saavn.tracks, ...audius.tracks]) {
-      if (!trackIds.has(t.id)) {
+      if (t && t.id && !trackIds.has(t.id)) {
         trackIds.add(t.id);
         combinedTracks.push(t);
       }
@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
     const artistNames = new Set<string>();
     const combinedArtists = [];
     for (const a of [...saavn.artists, ...audius.artists]) {
+      if (!a || !a.name) continue;
       const lower = a.name.toLowerCase();
       if (!artistNames.has(lower)) {
         artistNames.add(lower);
@@ -43,6 +44,7 @@ export async function GET(req: NextRequest) {
     // Add community created playlists first
     const communityPlaylists = searchCommunityPlaylists(q);
     for (const cp of communityPlaylists) {
+      if (!cp || !cp.name) continue;
       playlistTitles.add(cp.name.toLowerCase());
       combinedPlaylists.push({
         id: `user:${cp.id}`,
@@ -60,6 +62,7 @@ export async function GET(req: NextRequest) {
     }
 
     for (const p of [...saavn.playlists, ...audius.playlists]) {
+      if (!p || !p.title) continue;
       const lower = p.title.toLowerCase();
       if (!playlistTitles.has(lower)) {
         playlistTitles.add(lower);

@@ -345,13 +345,13 @@ export function getUserPlaylists(userId: string): UserPlaylist[] {
 
 export function searchCommunityPlaylists(query: string): UserPlaylist[] {
   const db = ensureDb();
-  const q = query.toLowerCase().trim();
+  const q = (query || "").toLowerCase().trim();
   if (!q) return [];
   return (db.playlists || []).filter((p) => {
-    if (p.isPublic === false) return false;
-    if (p.name.toLowerCase().includes(q)) return true;
-    if (p.creatorName?.toLowerCase().includes(q)) return true;
-    if (p.description?.toLowerCase().includes(q)) return true;
+    if (!p || p.isPublic === false) return false;
+    if (p.name && p.name.toLowerCase().includes(q)) return true;
+    if (p.creatorName && p.creatorName.toLowerCase().includes(q)) return true;
+    if (p.description && p.description.toLowerCase().includes(q)) return true;
     return false;
   });
 }
