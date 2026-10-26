@@ -13,7 +13,7 @@ interface LibraryState {
   isLiked: (trackId: string) => boolean;
   toggleLike: (track: Track) => void;
   recordPlay: (track: Track) => void;
-  createPlaylist: (name: string, firstTrack?: Track) => UserPlaylist;
+  createPlaylist: (name: string, firstTrack?: Track, isPublic?: boolean) => UserPlaylist;
   renamePlaylist: (id: string, name: string) => void;
   deletePlaylist: (id: string) => void;
   addToPlaylist: (playlistId: string, track: Track) => void;
@@ -35,12 +35,21 @@ export const useLibrary = create<LibraryState>()(
       savedCollections: [],
 
       isLiked: (id) => get().liked.some((t) => t.id === id),
-      toggleLike: (track) =>
+      toggleLike: (track) => {
         set((s) => ({
           liked: s.liked.some((t) => t.id === track.id)
             ? s.liked.filter((t) => t.id !== track.id)
             : [track, ...s.liked],
-        })),
+        }));
+
+        if (typeof window !== "undefined") {
+          fetch("/api/user/liked", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ track }),
+          }).catch(() => {});
+        }
+      },
       recordPlay: (track) => {
         if (typeof window !== "undefined") {
           import("./auth").then((m) => m.useAuth.getState().recordListen(track));
@@ -52,12 +61,12 @@ export const useLibrary = create<LibraryState>()(
           return { history: [track, ...filtered].slice(0, 50) };
         });
       },
-      createPlaylist: (name, firstTrack) => {
+      createPlaylist: (name, firstTrack, isPublic = true) => {
         const tempId = uid();
         const pl: UserPlaylist = {
           id: tempId,
           name: name.trim() || `My Playlist #${get().playlists.length + 1}`,
-          isPublic: true,
+          isPublic,
           trackIds: firstTrack ? [firstTrack.id] : [],
           tracks: firstTrack ? [firstTrack] : [],
           createdAt: Date.now(),
@@ -73,7 +82,7 @@ export const useLibrary = create<LibraryState>()(
             body: JSON.stringify({
               name: pl.name,
               firstTrack,
-              isPublic: true,
+              isPublic,
             }),
           })
             .then(async (res) => {
@@ -176,18 +185,27 @@ export const useLibrary = create<LibraryState>()(
       syncPlaylists: async () => {
         if (typeof window === "undefined") return;
         try {
-          const res = await fetch("/api/user/playlists", { cache: "no-store" });
-          if (res.ok) {
-            const data = await res.json();
+          const [plRes, likedRes] = await Promise.all([
+            fetch("/api/user/playlists", { cache: "no-store" }),
+            fetch("/api/user/liked", { cache: "no-store" }),
+          ]);
+          if (plRes.ok) {
+            const data = await plRes.json();
             if (Array.isArray(data.playlists) && data.playlists.length > 0) {
               set({ playlists: data.playlists });
+            }
+          }
+          if (likedRes.ok) {
+            const data = await likedRes.json();
+            if (Array.isArray(data.liked) && data.liked.length > 0) {
+              set({ liked: data.liked });
             }
           }
         } catch {}
       },
 
       resetForUser: () => {
-        set({ playlists: [] });
+        set({ playlists: [], liked: [] });
       },
     }),
     { name: "resonance.library" },

@@ -7,6 +7,7 @@ import { Heart } from "lucide-react";
 import { ErrorState } from "@/components/media/ErrorState";
 import { PageHeader } from "@/components/media/PageHeader";
 import { PlayButton } from "@/components/media/PlayButton";
+import { ShareButton } from "@/components/media/ShareButton";
 import { TrackList, TrackListSkeleton } from "@/components/media/TrackList";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCollection } from "@/lib/api";
@@ -51,6 +52,23 @@ function PlaylistView() {
   const total = tracks.reduce((sum, t) => sum + t.durationSec, 0);
   const type = collection.kind === "album" ? "Album" : "Playlist";
 
+  const distinctArtworks =
+    collection.kind === "playlist"
+      ? Array.from(
+          new Set(tracks.map((t) => t.artworkLarge || t.artwork).filter(Boolean)),
+        ).slice(0, 4)
+      : [];
+
+  const mosaicCover =
+    distinctArtworks.length >= 4 ? (
+      <div className="grid grid-cols-2 grid-rows-2 size-40 sm:size-52 shrink-0 overflow-hidden rounded-md shadow-2xl shadow-black/60 bg-neutral-800">
+        {distinctArtworks.map((src, i) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img key={i} src={src} alt="" className="size-full object-cover" />
+        ))}
+      </div>
+    ) : undefined;
+
   return (
     <div className="space-y-6 pb-10">
       <PageHeader
@@ -58,10 +76,18 @@ function PlaylistView() {
         title={collection.title}
         seed={collection.id}
         image={collection.artworkLarge || collection.artwork}
+        cover={mosaicCover}
         description={collection.description}
         meta={
           <>
-            {collection.id.startsWith("user:") ? (
+            {collection.id.startsWith("user:") && collection.owner.id && collection.owner.id !== "guest" ? (
+              <Link
+                href={`/user/${collection.owner.id}`}
+                className="font-semibold text-white hover:underline focus-visible:underline"
+              >
+                {collection.owner.name}
+              </Link>
+            ) : collection.id.startsWith("user:") ? (
               <span className="font-semibold text-white">
                 {collection.owner.name}
               </span>
@@ -99,6 +125,7 @@ function PlaylistView() {
         >
           <Heart className="size-7" fill={saved ? "currentColor" : "none"} aria-hidden />
         </button>
+        <ShareButton title={collection.title} />
       </PageHeader>
 
       {tracks.length > 0 ? (

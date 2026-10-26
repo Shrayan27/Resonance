@@ -7,6 +7,7 @@ import { ListMusic, Pencil, Trash2 } from "lucide-react";
 import { EmptyState } from "@/components/media/ErrorState";
 import { PageHeader } from "@/components/media/PageHeader";
 import { PlayButton } from "@/components/media/PlayButton";
+import { ShareButton } from "@/components/media/ShareButton";
 import { TrackList, TrackListSkeleton } from "@/components/media/TrackList";
 import { Button } from "@/components/ui/button";
 import {
@@ -133,6 +134,20 @@ function UserPlaylistView() {
 
   const creatorDisplay = playlist.creatorName || (user?.name ? user.name : "You");
 
+  const distinctArtworks = Array.from(
+    new Set(playlist.tracks.map((t) => t.artworkLarge || t.artwork).filter(Boolean)),
+  ).slice(0, 4);
+
+  const mosaicCover =
+    distinctArtworks.length >= 4 ? (
+      <div className="grid grid-cols-2 grid-rows-2 size-40 sm:size-52 shrink-0 overflow-hidden rounded-md shadow-2xl shadow-black/60 bg-neutral-800">
+        {distinctArtworks.map((src, i) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img key={i} src={src} alt="" className="size-full object-cover" />
+        ))}
+      </div>
+    ) : undefined;
+
   return (
     <div className="space-y-6 pb-10">
       <PageHeader
@@ -140,6 +155,7 @@ function UserPlaylistView() {
         title={title}
         seed={playlist.id}
         image={cover}
+        cover={mosaicCover}
         description={playlist.description}
         meta={
           <>
@@ -158,6 +174,10 @@ function UserPlaylistView() {
         }
       >
         <PlayButton tracks={playlist.tracks} label={playlist.name} />
+        <ShareButton
+          title={playlist.name}
+          url={typeof window !== "undefined" ? `${window.location.origin}/playlist/user:${playlist.id.replace(/^user:/, "")}` : undefined}
+        />
         <Button
           variant="ghost"
           onClick={() => setConfirmDelete(true)}

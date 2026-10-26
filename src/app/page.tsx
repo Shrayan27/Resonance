@@ -57,6 +57,14 @@ export default function HomePage() {
             </Shelf>
           )}
 
+          {data.communityPlaylists && data.communityPlaylists.length > 0 && (
+            <Shelf title="Created by Listeners">
+              {data.communityPlaylists.map((c) => (
+                <CollectionCard key={c.id} collection={c} />
+              ))}
+            </Shelf>
+          )}
+
           {data.artists.length > 0 && (
             <Shelf title="Popular artists">
               {data.artists.map((a) => (

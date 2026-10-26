@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import type { Track, UserPlaylist } from "./types";
+import type { Collection, Track, UserPlaylist } from "./types";
 
 export interface UserTaste {
   preferredGenres: string[];
@@ -21,6 +21,7 @@ export interface UserAccount {
   avatarColor: string;
   createdAt: number;
   taste: UserTaste;
+  liked?: Track[];
 }
 
 export interface Session {
@@ -112,6 +113,23 @@ export function findUserByEmail(email: string): UserAccount | null {
 export function findUserById(id: string): UserAccount | null {
   const db = ensureDb();
   return db.users.find((u) => u.id === id) || null;
+}
+
+export function getUserPublicProfile(id: string) {
+  const db = ensureDb();
+  const user = db.users.find((u) => u.id === id);
+  if (!user) return null;
+  const publicPlaylists = (db.playlists || []).filter(
+    (p) => p.creatorId === id && p.isPublic !== false,
+  );
+  return {
+    id: user.id,
+    name: user.name,
+    avatarColor: user.avatarColor,
+    createdAt: user.createdAt,
+    preferredGenres: user.taste?.preferredGenres || [],
+    playlists: publicPlaylists,
+  };
 }
 
 export function createUser(data: {
@@ -356,6 +374,27 @@ export function searchCommunityPlaylists(query: string): UserPlaylist[] {
   });
 }
 
+export function getRecentCommunityPlaylists(limit = 12): Collection[] {
+  const db = ensureDb();
+  const publicPlaylists = (db.playlists || [])
+    .filter((p) => p && p.isPublic !== false && p.tracks && p.tracks.length > 0)
+    .slice(0, limit);
+
+  return publicPlaylists.map((cp) => ({
+    id: `user:${cp.id}`,
+    kind: "playlist" as const,
+    title: cp.name,
+    description: cp.description,
+    owner: {
+      id: cp.creatorId || "",
+      name: cp.creatorName ? `Created by ${cp.creatorName}` : "Community",
+    },
+    artwork: cp.tracks[0]?.artworkLarge || cp.tracks[0]?.artwork || "",
+    artworkLarge: cp.tracks[0]?.artworkLarge || cp.tracks[0]?.artwork || "",
+    trackCount: cp.tracks.length,
+  }));
+}
+
 export function updateCommunityPlaylist(
   id: string,
   requesterUserId: string,
@@ -401,4 +440,21 @@ export function deleteCommunityPlaylist(id: string, requesterUserId: string): bo
   db.playlists = db.playlists.filter((p) => p.id !== cleanId);
   saveDb(db);
   return true;
+}
+
+export function getUserLikedTracks(userId: string): Track[] {
+  const db = ensureDb();
+  const user = db.users.find((u) => u.id === userId);
+  return user?.liked || [];
+}
+
+export function toggleUserLikedTrack(userId: string, track: Track): Track[] {
+  const db = ensureDb();
+  const user = db.users.find((u) => u.id === userId);
+  if (!user) return [];
+  const current = user.liked || [];
+  const exists = current.some((t) => t.id === track.id);
+  user.liked = exists ? current.filter((t) => t.id !== track.id) : [track, ...current];
+  saveDb(db);
+  return user.liked;
 }

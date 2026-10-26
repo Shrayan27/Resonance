@@ -41,6 +41,7 @@ export interface Artist {
 export interface HomeFeed {
   trending: Track[];
   playlists: Collection[];
+  communityPlaylists?: Collection[];
   artists: Artist[];
   genres: Record<string, Track[]>;
 }

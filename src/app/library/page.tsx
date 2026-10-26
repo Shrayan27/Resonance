@@ -51,7 +51,12 @@ export default function LibraryPage() {
               href={`/library/playlist/${p.id}`}
               title={p.name}
               subtitle={`Playlist · ${p.tracks.length} ${p.tracks.length === 1 ? "song" : "songs"}`}
-              cover={<CoverTile src={p.tracks[0]?.artworkLarge || p.tracks[0]?.artwork} />}
+              cover={
+                <CoverTile
+                  src={p.tracks[0]?.artworkLarge || p.tracks[0]?.artwork}
+                  images={p.tracks.map((t) => t.artworkLarge || t.artwork)}
+                />
+              }
             />
           ))}
         {hydrated &&
