@@ -20,9 +20,11 @@ interface LibraryState {
   removeFromPlaylist: (playlistId: string, trackId: string) => void;
   toggleSaveCollection: (c: Collection) => void;
   isCollectionSaved: (id: string) => boolean;
+  syncPlaylists: () => Promise<void>;
+  resetForUser: () => void;
 }
 
-const uid = () => Math.random().toString(36).slice(2, 10);
+const uid = () => `pl_${Math.random().toString(36).slice(2, 10)}`;
 
 export const useLibrary = create<LibraryState>()(
   persist(
@@ -51,35 +53,118 @@ export const useLibrary = create<LibraryState>()(
         });
       },
       createPlaylist: (name, firstTrack) => {
+        const tempId = uid();
         const pl: UserPlaylist = {
-          id: uid(),
+          id: tempId,
           name: name.trim() || `My Playlist #${get().playlists.length + 1}`,
+          isPublic: true,
           trackIds: firstTrack ? [firstTrack.id] : [],
           tracks: firstTrack ? [firstTrack] : [],
           createdAt: Date.now(),
+          updatedAt: Date.now(),
         };
+
         set((s) => ({ playlists: [pl, ...s.playlists] }));
+
+        if (typeof window !== "undefined") {
+          fetch("/api/user/playlists", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: pl.name,
+              firstTrack,
+              isPublic: true,
+            }),
+          })
+            .then(async (res) => {
+              if (res.ok) {
+                const data = await res.json();
+                if (data.playlist) {
+                  set((s) => ({
+                    playlists: s.playlists.map((p) => (p.id === tempId ? data.playlist : p)),
+                  }));
+                }
+              }
+            })
+            .catch(() => {});
+        }
+
         return pl;
       },
-      renamePlaylist: (id, name) =>
-        set((s) => ({ playlists: s.playlists.map((p) => (p.id === id ? { ...p, name } : p)) })),
-      deletePlaylist: (id) => set((s) => ({ playlists: s.playlists.filter((p) => p.id !== id) })),
-      addToPlaylist: (pid, track) =>
+      renamePlaylist: (id, name) => {
+        const trimmed = name.trim();
         set((s) => ({
-          playlists: s.playlists.map((p) =>
-            p.id === pid && !p.trackIds.includes(track.id)
-              ? { ...p, trackIds: [...p.trackIds, track.id], tracks: [...p.tracks, track] }
-              : p,
-          ),
-        })),
-      removeFromPlaylist: (pid, tid) =>
-        set((s) => ({
-          playlists: s.playlists.map((p) =>
-            p.id === pid
-              ? { ...p, trackIds: p.trackIds.filter((i) => i !== tid), tracks: p.tracks.filter((t) => t.id !== tid) }
-              : p,
-          ),
-        })),
+          playlists: s.playlists.map((p) => (p.id === id ? { ...p, name: trimmed } : p)),
+        }));
+
+        if (typeof window !== "undefined") {
+          fetch(`/api/user/playlists/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: trimmed }),
+          }).catch(() => {});
+        }
+      },
+      deletePlaylist: (id) => {
+        set((s) => ({ playlists: s.playlists.filter((p) => p.id !== id) }));
+
+        if (typeof window !== "undefined") {
+          fetch(`/api/user/playlists/${id}`, { method: "DELETE" }).catch(() => {});
+        }
+      },
+      addToPlaylist: (pid, track) => {
+        let updatedTracks: Track[] = [];
+        set((s) => {
+          const updated = s.playlists.map((p) => {
+            if (p.id === pid && !p.trackIds.includes(track.id)) {
+              updatedTracks = [...p.tracks, track];
+              return {
+                ...p,
+                trackIds: [...p.trackIds, track.id],
+                tracks: updatedTracks,
+                updatedAt: Date.now(),
+              };
+            }
+            if (p.id === pid) updatedTracks = p.tracks;
+            return p;
+          });
+          return { playlists: updated };
+        });
+
+        if (typeof window !== "undefined" && updatedTracks.length > 0) {
+          fetch(`/api/user/playlists/${pid}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tracks: updatedTracks }),
+          }).catch(() => {});
+        }
+      },
+      removeFromPlaylist: (pid, tid) => {
+        let updatedTracks: Track[] = [];
+        set((s) => {
+          const updated = s.playlists.map((p) => {
+            if (p.id === pid) {
+              updatedTracks = p.tracks.filter((t) => t.id !== tid);
+              return {
+                ...p,
+                trackIds: p.trackIds.filter((i) => i !== tid),
+                tracks: updatedTracks,
+                updatedAt: Date.now(),
+              };
+            }
+            return p;
+          });
+          return { playlists: updated };
+        });
+
+        if (typeof window !== "undefined") {
+          fetch(`/api/user/playlists/${pid}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tracks: updatedTracks }),
+          }).catch(() => {});
+        }
+      },
       toggleSaveCollection: (c) =>
         set((s) => ({
           savedCollections: s.savedCollections.some((x) => x.id === c.id)
@@ -87,6 +172,23 @@ export const useLibrary = create<LibraryState>()(
             : [c, ...s.savedCollections],
         })),
       isCollectionSaved: (id) => get().savedCollections.some((c) => c.id === id),
+
+      syncPlaylists: async () => {
+        if (typeof window === "undefined") return;
+        try {
+          const res = await fetch("/api/user/playlists", { cache: "no-store" });
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data.playlists) && data.playlists.length > 0) {
+              set({ playlists: data.playlists });
+            }
+          }
+        } catch {}
+      },
+
+      resetForUser: () => {
+        set({ playlists: [] });
+      },
     }),
     { name: "resonance.library" },
   ),

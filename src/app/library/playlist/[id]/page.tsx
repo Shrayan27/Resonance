@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { ListMusic, Pencil, Trash2 } from "lucide-react";
 import { EmptyState } from "@/components/media/ErrorState";
 import { PageHeader } from "@/components/media/PageHeader";
@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDuration } from "@/lib/duration";
 import { useHydrated } from "@/lib/use-hydrated";
+import { useAuth } from "@/stores/auth";
 import { useLibrary } from "@/stores/library";
 
 function PageSkeleton() {
@@ -46,12 +47,25 @@ function UserPlaylistView() {
   const router = useRouter();
   const hydrated = useHydrated();
   const playlist = useLibrary((s) => s.playlists.find((p) => p.id === id));
+  const user = useAuth((s) => s.user);
   const rename = useLibrary((s) => s.renamePlaylist);
   const remove = useLibrary((s) => s.deletePlaylist);
   const removeTrack = useLibrary((s) => s.removeFromPlaylist);
   const [draft, setDraft] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const cancelled = useRef(false);
+
+  useEffect(() => {
+    if (hydrated && !playlist && id) {
+      fetch(`/api/user/playlists/${id}`)
+        .then((res) => {
+          if (res.ok) {
+            router.replace(`/playlist/user:${id}`);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [hydrated, playlist, id, router]);
 
   if (!hydrated) return <PageSkeleton />;
 
@@ -117,6 +131,8 @@ function UserPlaylistView() {
       />
     );
 
+  const creatorDisplay = playlist.creatorName || (user?.name ? user.name : "You");
+
   return (
     <div className="space-y-6 pb-10">
       <PageHeader
@@ -127,7 +143,7 @@ function UserPlaylistView() {
         description={playlist.description}
         meta={
           <>
-            <span className="font-semibold text-white">You</span>
+            <span className="font-semibold text-white">Created by {creatorDisplay}</span>
             <span aria-hidden>·</span>
             <span>
               {playlist.tracks.length} {playlist.tracks.length === 1 ? "song" : "songs"}

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import type { Track, UserPlaylist } from "./types";
 
 export interface UserTaste {
   preferredGenres: string[];
@@ -32,6 +33,7 @@ export interface Session {
 interface DatabaseSchema {
   users: UserAccount[];
   sessions: Session[];
+  playlists: UserPlaylist[];
 }
 
 const DB_DIR = process.env.VERCEL
@@ -39,7 +41,7 @@ const DB_DIR = process.env.VERCEL
   : path.join(process.cwd(), "data");
 const DB_FILE = path.join(DB_DIR, "resonance.json");
 
-let memoryFallbackDb: DatabaseSchema = { users: [], sessions: [] };
+let memoryFallbackDb: DatabaseSchema = { users: [], sessions: [], playlists: [] };
 
 const AVATAR_GRADIENTS = [
   "from-emerald-400 to-teal-600",
@@ -57,7 +59,7 @@ function ensureDb(): DatabaseSchema {
     }
 
     if (!fs.existsSync(DB_FILE)) {
-      const initial: DatabaseSchema = { users: [], sessions: [] };
+      const initial: DatabaseSchema = { users: [], sessions: [], playlists: [] };
       fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2), "utf8");
       memoryFallbackDb = initial;
       return initial;
@@ -68,6 +70,7 @@ function ensureDb(): DatabaseSchema {
     const data: DatabaseSchema = {
       users: Array.isArray(parsed.users) ? parsed.users : [],
       sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
+      playlists: Array.isArray(parsed.playlists) ? parsed.playlists : [],
     };
     memoryFallbackDb = data;
     return data;
@@ -297,4 +300,105 @@ export function updateUserPreferences(
   user.taste.lastUpdated = Date.now();
   saveDb(db);
   return user.taste;
+}
+
+export function createCommunityPlaylist(data: {
+  name: string;
+  description?: string;
+  creatorId: string;
+  creatorName: string;
+  firstTrack?: Track;
+  tracks?: Track[];
+  isPublic?: boolean;
+}): UserPlaylist {
+  const db = ensureDb();
+  const id = `pl_${crypto.randomBytes(6).toString("hex")}`;
+  const tracks = data.tracks || (data.firstTrack ? [data.firstTrack] : []);
+  const playlist: UserPlaylist = {
+    id,
+    name: data.name.trim() || "Untitled Playlist",
+    description: data.description?.trim(),
+    creatorId: data.creatorId,
+    creatorName: data.creatorName || "Music Lover",
+    isPublic: data.isPublic ?? true,
+    trackIds: tracks.map((t) => t.id),
+    tracks,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  db.playlists = [playlist, ...(db.playlists || [])];
+  saveDb(db);
+  return playlist;
+}
+
+export function getPlaylistById(id: string): UserPlaylist | null {
+  const db = ensureDb();
+  const cleanId = id.replace(/^user:/, "");
+  return db.playlists.find((p) => p.id === cleanId) || null;
+}
+
+export function getUserPlaylists(userId: string): UserPlaylist[] {
+  const db = ensureDb();
+  return (db.playlists || []).filter((p) => p.creatorId === userId);
+}
+
+export function searchCommunityPlaylists(query: string): UserPlaylist[] {
+  const db = ensureDb();
+  const q = query.toLowerCase().trim();
+  if (!q) return [];
+  return (db.playlists || []).filter((p) => {
+    if (p.isPublic === false) return false;
+    if (p.name.toLowerCase().includes(q)) return true;
+    if (p.creatorName?.toLowerCase().includes(q)) return true;
+    if (p.description?.toLowerCase().includes(q)) return true;
+    return false;
+  });
+}
+
+export function updateCommunityPlaylist(
+  id: string,
+  requesterUserId: string,
+  updates: {
+    name?: string;
+    description?: string;
+    tracks?: Track[];
+    isPublic?: boolean;
+  },
+): UserPlaylist | null {
+  const db = ensureDb();
+  const cleanId = id.replace(/^user:/, "");
+  const playlist = db.playlists.find((p) => p.id === cleanId);
+  if (!playlist) return null;
+
+  if (playlist.creatorId && playlist.creatorId !== requesterUserId) {
+    throw new Error("Forbidden: You do not own this playlist");
+  }
+
+  if (updates.name !== undefined) playlist.name = updates.name.trim() || playlist.name;
+  if (updates.description !== undefined) playlist.description = updates.description.trim();
+  if (updates.tracks !== undefined) {
+    playlist.tracks = updates.tracks;
+    playlist.trackIds = updates.tracks.map((t) => t.id);
+  }
+  if (updates.isPublic !== undefined) playlist.isPublic = updates.isPublic;
+  playlist.updatedAt = Date.now();
+
+  saveDb(db);
+  return playlist;
+}
+
+export function deleteCommunityPlaylist(id: string, requesterUserId: string): boolean {
+  const db = ensureDb();
+  const cleanId = id.replace(/^user:/, "");
+  const playlist = db.playlists.find((p) => p.id === cleanId);
+  if (!playlist) return false;
+
+  if (playlist.creatorId && playlist.creatorId !== requesterUserId) {
+    throw new Error("Forbidden: You do not own this playlist");
+  }
+
+  db.playlists = db.playlists.filter((p) => p.id !== cleanId);
+  saveDb(db);
+  return true;
 }

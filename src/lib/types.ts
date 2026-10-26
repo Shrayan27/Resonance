@@ -67,9 +67,13 @@ export interface UserPlaylist {
   id: string;
   name: string;
   description?: string;
+  creatorId?: string;
+  creatorName?: string;
+  isPublic?: boolean;
   trackIds: string[];
   tracks: Track[];
   createdAt: number;
+  updatedAt?: number;
 }
 
 export interface LyricLine {

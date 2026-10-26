@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { search as searchAudius } from "@/lib/audius";
 import { searchSaavn } from "@/lib/saavn";
+import { searchCommunityPlaylists } from "@/lib/db";
 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim();
@@ -38,6 +39,26 @@ export async function GET(req: NextRequest) {
 
     const playlistTitles = new Set<string>();
     const combinedPlaylists = [];
+
+    // Add community created playlists first
+    const communityPlaylists = searchCommunityPlaylists(q);
+    for (const cp of communityPlaylists) {
+      playlistTitles.add(cp.name.toLowerCase());
+      combinedPlaylists.push({
+        id: `user:${cp.id}`,
+        kind: "playlist" as const,
+        title: cp.name,
+        description: cp.description,
+        owner: {
+          id: cp.creatorId || "",
+          name: cp.creatorName ? `Created by ${cp.creatorName}` : "Community",
+        },
+        artwork: cp.tracks[0]?.artworkLarge || cp.tracks[0]?.artwork || "",
+        artworkLarge: cp.tracks[0]?.artworkLarge || cp.tracks[0]?.artwork || "",
+        trackCount: cp.tracks.length,
+      });
+    }
+
     for (const p of [...saavn.playlists, ...audius.playlists]) {
       const lower = p.title.toLowerCase();
       if (!playlistTitles.has(lower)) {

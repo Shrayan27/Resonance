@@ -69,6 +69,9 @@ export const useAuth = create<AuthState>((set, get) => ({
       if (res.ok) {
         const data = await res.json();
         set({ user: data.user || null, isLoading: false });
+        if (data.user) {
+          import("./library").then((m) => m.useLibrary.getState().syncPlaylists());
+        }
       } else {
         set({ user: null, isLoading: false });
       }
@@ -89,6 +92,7 @@ export const useAuth = create<AuthState>((set, get) => ({
         return { success: false, error: data.error || "Login failed" };
       }
       set({ user: data.user, isAuthModalOpen: false });
+      import("./library").then((m) => m.useLibrary.getState().syncPlaylists());
       return { success: true };
     } catch (err) {
       return { success: false, error: (err as Error).message || "Connection error" };
@@ -107,6 +111,7 @@ export const useAuth = create<AuthState>((set, get) => ({
         return { success: false, error: resData.error || "Signup failed" };
       }
       set({ user: resData.user, isAuthModalOpen: false });
+      import("./library").then((m) => m.useLibrary.getState().syncPlaylists());
       return { success: true };
     } catch (err) {
       return { success: false, error: (err as Error).message || "Connection error" };
@@ -118,6 +123,7 @@ export const useAuth = create<AuthState>((set, get) => ({
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
       set({ user: null, isTasteModalOpen: false });
+      import("./library").then((m) => m.useLibrary.getState().resetForUser());
     }
   },
 

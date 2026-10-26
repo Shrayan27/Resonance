@@ -61,12 +61,18 @@ function PlaylistView() {
         description={collection.description}
         meta={
           <>
-            <Link
-              href={`/artist/${collection.owner.id}`}
-              className="font-semibold text-white hover:underline focus-visible:underline"
-            >
-              {collection.owner.name}
-            </Link>
+            {collection.id.startsWith("user:") ? (
+              <span className="font-semibold text-white">
+                {collection.owner.name}
+              </span>
+            ) : (
+              <Link
+                href={`/artist/${collection.owner.id}`}
+                className="font-semibold text-white hover:underline focus-visible:underline"
+              >
+                {collection.owner.name}
+              </Link>
+            )}
             <span aria-hidden>·</span>
             <span>
               {tracks.length} {tracks.length === 1 ? "song" : "songs"}
