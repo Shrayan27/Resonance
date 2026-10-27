@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { supabase } from "./supabase";
 import type { Collection, Track, UserPlaylist } from "./types";
 
 export interface UserTaste {
@@ -43,6 +44,76 @@ const DB_DIR = process.env.VERCEL
 const DB_FILE = path.join(DB_DIR, "resonance.json");
 
 let memoryFallbackDb: DatabaseSchema = { users: [], sessions: [], playlists: [] };
+
+let isHydrated = false;
+export async function hydrateFromSupabase() {
+  if (isHydrated) return;
+  try {
+    const [uRes, pRes, sRes] = await Promise.all([
+      supabase.from("user_accounts").select("*"),
+      supabase.from("playlists").select("*"),
+      supabase.from("sessions").select("*"),
+    ]);
+
+    if (uRes.data && uRes.data.length > 0) {
+      memoryFallbackDb.users = uRes.data.map((u: any) => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        passwordHash: u.password_hash,
+        salt: u.salt,
+        avatarColor: u.avatar_color,
+        createdAt: Number(u.created_at),
+        taste: u.taste || {
+          preferredGenres: [],
+          preferredArtists: [],
+          genreWeights: {},
+          artistWeights: {},
+          totalPlays: 0,
+          lastUpdated: Date.now(),
+        },
+        liked: u.liked || [],
+      }));
+    }
+
+    if (pRes.data && pRes.data.length > 0) {
+      memoryFallbackDb.playlists = pRes.data.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description || undefined,
+        creatorId: p.creator_id || undefined,
+        creatorName: p.creator_name || undefined,
+        isPublic: p.is_public ?? true,
+        trackIds: Array.isArray(p.tracks) ? p.tracks.map((t: any) => t.id) : [],
+        tracks: Array.isArray(p.tracks) ? p.tracks : [],
+        createdAt: Number(p.created_at),
+        updatedAt: Number(p.updated_at),
+      }));
+    }
+
+    if (sRes.data && sRes.data.length > 0) {
+      memoryFallbackDb.sessions = sRes.data.map((s: any) => ({
+        token: s.token,
+        userId: s.user_id,
+        createdAt: Number(s.created_at),
+        expiresAt: Number(s.expires_at),
+      }));
+    }
+
+    isHydrated = true;
+  } catch (err) {
+    console.error("Supabase hydration error:", err);
+  }
+}
+
+function bgSync(p: any) {
+  Promise.resolve(p).catch((err) => {
+    console.error("Supabase sync background error:", err);
+  });
+}
+
+// Background initial hydration
+bgSync(hydrateFromSupabase());
 
 const AVATAR_GRADIENTS = [
   "from-emerald-400 to-teal-600",
@@ -176,6 +247,21 @@ export function createUser(data: {
 
   db.users.push(newUser);
   saveDb(db);
+
+  bgSync(
+    supabase.from("user_accounts").upsert({
+      id,
+      name: newUser.name,
+      email: newUser.email,
+      password_hash: passwordHash,
+      salt,
+      avatar_color: avatarColor,
+      taste: newUser.taste,
+      liked: [],
+      created_at: newUser.createdAt,
+    })
+  );
+
   return newUser;
 }
 
@@ -206,6 +292,16 @@ export function createSession(userId: string): Session {
   db.sessions = db.sessions.filter((s) => s.expiresAt > Date.now());
   db.sessions.push(session);
   saveDb(db);
+
+  bgSync(
+    supabase.from("sessions").upsert({
+      token,
+      user_id: userId,
+      created_at: session.createdAt,
+      expires_at: session.expiresAt,
+    })
+  );
+
   return session;
 }
 
@@ -213,6 +309,8 @@ export function deleteSession(token: string) {
   const db = ensureDb();
   db.sessions = db.sessions.filter((s) => s.token !== token);
   saveDb(db);
+
+  bgSync(supabase.from("sessions").delete().eq("token", token));
 }
 
 export function getUserFromSession(token?: string | null): UserAccount | null {
@@ -288,6 +386,9 @@ export function recordUserListen(
 
   user.taste = taste;
   saveDb(db);
+
+  bgSync(supabase.from("user_accounts").update({ taste: user.taste }).eq("id", userId));
+
   return taste;
 }
 
@@ -317,6 +418,9 @@ export function updateUserPreferences(
 
   user.taste.lastUpdated = Date.now();
   saveDb(db);
+
+  bgSync(supabase.from("user_accounts").update({ taste: user.taste }).eq("id", userId));
+
   return user.taste;
 }
 
@@ -347,6 +451,21 @@ export function createCommunityPlaylist(data: {
 
   db.playlists = [playlist, ...(db.playlists || [])];
   saveDb(db);
+
+  bgSync(
+    supabase.from("playlists").upsert({
+      id: playlist.id,
+      name: playlist.name,
+      description: playlist.description || null,
+      creator_id: playlist.creatorId || null,
+      creator_name: playlist.creatorName || null,
+      is_public: playlist.isPublic,
+      tracks: playlist.tracks,
+      created_at: playlist.createdAt,
+      updated_at: playlist.updatedAt,
+    })
+  );
+
   return playlist;
 }
 
@@ -424,6 +543,20 @@ export function updateCommunityPlaylist(
   playlist.updatedAt = Date.now();
 
   saveDb(db);
+
+  bgSync(
+    supabase
+      .from("playlists")
+      .update({
+        name: playlist.name,
+        description: playlist.description || null,
+        is_public: playlist.isPublic,
+        tracks: playlist.tracks,
+        updated_at: playlist.updatedAt,
+      })
+      .eq("id", cleanId)
+  );
+
   return playlist;
 }
 
@@ -439,6 +572,9 @@ export function deleteCommunityPlaylist(id: string, requesterUserId: string): bo
 
   db.playlists = db.playlists.filter((p) => p.id !== cleanId);
   saveDb(db);
+
+  bgSync(supabase.from("playlists").delete().eq("id", cleanId));
+
   return true;
 }
 
@@ -456,5 +592,8 @@ export function toggleUserLikedTrack(userId: string, track: Track): Track[] {
   const exists = current.some((t) => t.id === track.id);
   user.liked = exists ? current.filter((t) => t.id !== track.id) : [track, ...current];
   saveDb(db);
+
+  bgSync(supabase.from("user_accounts").update({ liked: user.liked }).eq("id", userId));
+
   return user.liked;
 }
