@@ -11,6 +11,7 @@ import {
   Zap,
   Volume2,
   Sparkles,
+  Smartphone,
 } from "lucide-react";
 import { cn } from "cn";
 
@@ -97,6 +98,14 @@ export function EqualizerModal() {
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto space-y-6 pt-5 pr-1 -mr-1">
+          {/* Mobile Guidance Banner */}
+          <div className="sm:hidden rounded-2xl bg-brand/10 border border-brand/20 p-3 text-xs text-zinc-300 flex items-start gap-2.5">
+            <Smartphone className="size-4.5 shrink-0 text-brand mt-0.5" />
+            <span className="leading-relaxed">
+              <strong>Mobile Listening Tip:</strong> Use your phone's hardware volume rocker for overall loudness. Use the presets and preamp booster below to enrich bass, clarity, and quiet tracks.
+            </span>
+          </div>
+
           {/* Section 1: Sound Booster & Limiter */}
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4.5">
             <div className="flex items-center justify-between mb-3">

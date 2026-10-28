@@ -295,6 +295,12 @@ function MobilePlayerModal({
   const seekBy = usePlayer((s) => s.seekBy);
   const toggleShuffle = usePlayer((s) => s.toggleShuffle);
   const cycleRepeat = usePlayer((s) => s.cycleRepeat);
+  const volume = usePlayer((s) => s.volume);
+  const muted = usePlayer((s) => s.muted);
+  const setVolume = usePlayer((s) => s.setVolume);
+  const toggleMute = usePlayer((s) => s.toggleMute);
+  const setShowEqModal = usePlayer((s) => s.setShowEqModal);
+  const eqPreset = usePlayer((s) => s.eqPreset);
 
   const shuffleOn = hydrated && shuffle;
   const repeatMode = hydrated ? repeat : "off";
@@ -424,8 +430,77 @@ function MobilePlayerModal({
         </button>
       </div>
 
-      {/* Bottom Bar: Lyrics & Queue & Volume */}
-      <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-3">
+      {/* Mobile Volume & Sound Studio Card */}
+      <div className="mt-4 rounded-2xl bg-white/[0.04] border border-white/10 p-3.5 flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleMute}
+              className="text-zinc-300 hover:text-white"
+              aria-label={muted ? "Unmute" : "Mute"}
+            >
+              {muted ? (
+                <VolumeX className="size-4" />
+              ) : volume > 1 ? (
+                <Zap className="size-4 text-amber-400" />
+              ) : volume < 0.5 ? (
+                <Volume1 className="size-4" />
+              ) : (
+                <Volume2 className="size-4" />
+              )}
+            </button>
+            <span className="text-xs font-bold text-white">
+              {muted ? "Muted" : `${Math.round(volume * 100)}%`}
+            </span>
+            {volume > 1 && !muted && (
+              <span className="rounded bg-amber-500/25 px-1.5 py-0.2 text-[9px] font-black uppercase text-amber-300 ring-1 ring-amber-400/40">
+                BOOST
+              </span>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowEqModal(true)}
+            className={cn(
+              "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+              eqPreset !== "flat"
+                ? "bg-brand text-brand-foreground shadow-sm shadow-brand/20"
+                : "bg-white/10 text-zinc-300 hover:bg-white/15 hover:text-white",
+            )}
+          >
+            <Sliders className="size-3.5" />
+            <span>Sound Studio</span>
+          </button>
+        </div>
+
+        {/* Wide touch-friendly volume slider */}
+        <div className="relative flex items-center py-1">
+          <Slider
+            aria-label="Volume & Sound Boost"
+            className={cn(
+              sliderStyle,
+              "w-full",
+              volume > 1 &&
+                "[&_[data-slot=slider-range]]:bg-linear-to-r [&_[data-slot=slider-range]]:from-brand [&_[data-slot=slider-range]]:to-amber-400",
+            )}
+            min={0}
+            max={2.0}
+            step={0.01}
+            value={[muted ? 0 : volume]}
+            onValueChange={(v) => setVolume(sliderNumber(v), true)}
+          />
+          {/* 100% threshold mark */}
+          <div
+            title="100% Studio Level"
+            className="absolute left-1/2 top-1/2 -translate-y-1/2 w-0.5 h-3 bg-white/25 pointer-events-none rounded-full"
+          />
+        </div>
+      </div>
+
+      {/* Bottom Bar: Lyrics & Queue */}
+      <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -457,10 +532,6 @@ function MobilePlayerModal({
             <span>Queue</span>
           </button>
         </div>
-
-        <div className="scale-90 origin-right">
-          <VolumeControl compact />
-        </div>
       </div>
     </div>
   );
@@ -479,6 +550,8 @@ export function PlayerBar() {
   const toggleShuffle = usePlayer((s) => s.toggleShuffle);
   const cycleRepeat = usePlayer((s) => s.cycleRepeat);
   const setPanel = usePlayer((s) => s.setPanel);
+  const setShowEqModal = usePlayer((s) => s.setShowEqModal);
+  const eqPreset = usePlayer((s) => s.eqPreset);
   const progress = usePlayer((s) => (s.duration > 0 ? s.position / s.duration : 0));
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -526,6 +599,16 @@ export function PlayerBar() {
               <TrackInfo compact />
             </button>
             <LikeButton />
+            <Tip label="Sound Studio & EQ">
+              <button
+                type="button"
+                className={cn(iconBtn, eqPreset !== "flat" && active)}
+                aria-label="Sound Studio & EQ"
+                onClick={() => setShowEqModal(true)}
+              >
+                <Sliders className="size-[18px]" />
+              </button>
+            </Tip>
             <Tip label="Lyrics">
               <button
                 type="button"

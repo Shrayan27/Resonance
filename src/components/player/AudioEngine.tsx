@@ -60,6 +60,14 @@ function calculatePerceptualGain(volume: number, muted: boolean): number {
   return 1.0 + (volume - 1.0) * 1.5;
 }
 
+function isMobileClient(): boolean {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+  return (
+    /iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent) ||
+    (typeof navigator.maxTouchPoints === "number" && navigator.maxTouchPoints > 1 && window.innerWidth < 1024)
+  );
+}
+
 export function AudioEngine() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioGraph = useRef<WebAudioGraph | null>(null);
@@ -79,6 +87,8 @@ export function AudioEngine() {
   const error = usePlayer((s) => s.error);
 
   const initWebAudio = () => {
+    // Keep mobile devices on clean native audio output to avoid iOS silence / CORS blocks and preserve lockscreen playback
+    if (isMobileClient()) return;
     if (audioGraph.current || typeof window === "undefined") return;
     const audio = audioRef.current;
     if (!audio) return;
@@ -542,5 +552,5 @@ export function AudioEngine() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  return <audio ref={audioRef} crossOrigin="anonymous" preload="auto" className="hidden" aria-hidden="true" />;
+  return <audio ref={audioRef} preload="auto" className="hidden" aria-hidden="true" />;
 }
