@@ -21,6 +21,8 @@ import {
   Volume1,
   Volume2,
   VolumeX,
+  Sliders,
+  Zap,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -29,6 +31,8 @@ import { formatTime } from "@/lib/format";
 import { selectCurrentTrack, usePlayer } from "@/stores/player";
 import { useLibrary } from "@/stores/library";
 import { Tip, useHydrated } from "./shared";
+import { VolumeHud } from "./VolumeHud";
+import { EqualizerModal } from "./EqualizerModal";
 
 const sliderStyle = cn(
   "group/slider py-2",
@@ -111,32 +115,87 @@ function SeekBar({ disabled }: { disabled: boolean }) {
   );
 }
 
-function VolumeControl() {
+function VolumeControl({ compact = false }: { compact?: boolean }) {
   const hydrated = useHydrated();
   const volume = usePlayer((s) => s.volume);
   const muted = usePlayer((s) => s.muted);
   const setVolume = usePlayer((s) => s.setVolume);
+  const changeVolumeBy = usePlayer((s) => s.changeVolumeBy);
   const toggleMute = usePlayer((s) => s.toggleMute);
+  const setShowEqModal = usePlayer((s) => s.setShowEqModal);
+  const eqPreset = usePlayer((s) => s.eqPreset);
 
   const effective = hydrated ? (muted ? 0 : volume) : 0.7;
-  const Icon = effective === 0 ? VolumeX : effective < 0.5 ? Volume1 : Volume2;
+  const percent = Math.round(effective * 100);
+  const isBoosted = percent > 100;
+
+  let Icon = Volume2;
+  if (effective === 0) Icon = VolumeX;
+  else if (isBoosted) Icon = Zap;
+  else if (effective < 0.5) Icon = Volume1;
+
+  const onWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    changeVolumeBy(e.deltaY < 0 ? 0.05 : -0.05);
+  };
 
   return (
-    <div className="flex items-center gap-1">
-      <Tip label={muted ? "Unmute (M)" : "Mute (M)"}>
-        <button type="button" className={iconBtn} onClick={toggleMute} aria-label={muted ? "Unmute" : "Mute"} aria-pressed={muted}>
+    <div className="flex items-center gap-1 group/vol" onWheel={onWheel}>
+      <Tip
+        label={
+          muted
+            ? "Unmute (M) · Double click for 100%"
+            : `${percent}% · Click Mute (M) · Double click for 100%`
+        }
+      >
+        <button
+          type="button"
+          className={cn(iconBtn, isBoosted && "text-amber-400 hover:text-amber-300")}
+          onClick={toggleMute}
+          onDoubleClick={() => setVolume(1.0, true)}
+          aria-label={muted ? "Unmute" : "Mute"}
+          aria-pressed={muted}
+        >
           <Icon className="size-[18px]" />
         </button>
       </Tip>
-      <Slider
-        aria-label="Volume"
-        className={cn(sliderStyle, "w-24")}
-        min={0}
-        max={1}
-        step={0.01}
-        value={[effective]}
-        onValueChange={(v) => setVolume(sliderNumber(v))}
-      />
+
+      <div className="relative flex items-center">
+        <Slider
+          aria-label="Volume & Sound Boost"
+          className={cn(
+            sliderStyle,
+            compact ? "w-20" : "w-24 md:w-28",
+            isBoosted &&
+              "[&_[data-slot=slider-range]]:bg-linear-to-r [&_[data-slot=slider-range]]:from-brand [&_[data-slot=slider-range]]:to-amber-400",
+          )}
+          min={0}
+          max={2.0}
+          step={0.01}
+          value={[effective]}
+          onValueChange={(v) => setVolume(sliderNumber(v), true)}
+        />
+        {/* 100% Standard Marker Notch */}
+        <div
+          title="100% Studio Standard Level"
+          className="absolute left-1/2 top-1/2 -translate-y-1/2 w-0.5 h-2 bg-white/25 pointer-events-none rounded-full"
+        />
+      </div>
+
+      <Tip label="Sound Enhancer & Studio EQ">
+        <button
+          type="button"
+          className={cn(
+            iconBtn,
+            "size-8",
+            eqPreset !== "flat" && "text-brand hover:text-brand-strong bg-brand/10",
+          )}
+          onClick={() => setShowEqModal(true)}
+          aria-label="Equalizer and Sound Studio"
+        >
+          <Sliders className="size-4" />
+        </button>
+      </Tip>
     </div>
   );
 }
@@ -400,7 +459,7 @@ function MobilePlayerModal({
         </div>
 
         <div className="scale-90 origin-right">
-          <VolumeControl />
+          <VolumeControl compact />
         </div>
       </div>
     </div>
@@ -434,6 +493,8 @@ export function PlayerBar() {
 
   return (
     <TooltipProvider delay={400}>
+      <VolumeHud />
+      <EqualizerModal />
       <MobilePlayerModal open={mobileOpen} onClose={() => setMobileOpen(false)} hasTrack={hasTrack} />
       <footer
         aria-label="Player"

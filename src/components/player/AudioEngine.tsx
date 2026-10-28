@@ -36,8 +36,33 @@ function tryPlay(audio: HTMLAudioElement) {
     });
 }
 
+interface WebAudioGraph {
+  ctx: AudioContext;
+  source: MediaElementAudioSourceNode;
+  bassFilter: BiquadFilterNode;
+  midFilter: BiquadFilterNode;
+  trebleFilter: BiquadFilterNode;
+  gainNode: GainNode;
+  compressor: DynamicsCompressorNode;
+  active: boolean;
+}
+
+function calculatePerceptualGain(volume: number, muted: boolean): number {
+  if (muted || volume <= 0) return 0;
+  if (volume <= 1.0) {
+    // Quadratic power curve for natural logarithmic volume perception
+    return Math.pow(volume, 2);
+  }
+  // Loudness Boost (1.0 to 2.0):
+  // At 1.0 -> 1.0 (0 dB)
+  // At 1.5 -> 1.75 (+4.86 dB)
+  // At 2.0 -> 2.5 (+7.96 dB)
+  return 1.0 + (volume - 1.0) * 1.5;
+}
+
 export function AudioEngine() {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const audioGraph = useRef<WebAudioGraph | null>(null);
   const pendingSeek = useRef<number | null>(null);
   const lastProgressAt = useRef(0);
   const errorStreak = useRef(0);
@@ -49,8 +74,63 @@ export function AudioEngine() {
   const isPlaying = usePlayer((s) => s.isPlaying);
   const volume = usePlayer((s) => s.volume);
   const muted = usePlayer((s) => s.muted);
+  const customEq = usePlayer((s) => s.customEq);
   const seekRequest = usePlayer((s) => s.seekRequest);
   const error = usePlayer((s) => s.error);
+
+  const initWebAudio = () => {
+    if (audioGraph.current || typeof window === "undefined") return;
+    const audio = audioRef.current;
+    if (!audio) return;
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const source = ctx.createMediaElementSource(audio);
+
+      const bassFilter = ctx.createBiquadFilter();
+      bassFilter.type = "lowshelf";
+      bassFilter.frequency.value = 120;
+
+      const midFilter = ctx.createBiquadFilter();
+      midFilter.type = "peaking";
+      midFilter.frequency.value = 1500;
+      midFilter.Q.value = 1.0;
+
+      const trebleFilter = ctx.createBiquadFilter();
+      trebleFilter.type = "highshelf";
+      trebleFilter.frequency.value = 5000;
+
+      const gainNode = ctx.createGain();
+
+      const compressor = ctx.createDynamicsCompressor();
+      compressor.threshold.value = -3;
+      compressor.knee.value = 6;
+      compressor.ratio.value = 16;
+      compressor.attack.value = 0.003;
+      compressor.release.value = 0.25;
+
+      source.connect(bassFilter);
+      bassFilter.connect(midFilter);
+      midFilter.connect(trebleFilter);
+      trebleFilter.connect(gainNode);
+      gainNode.connect(compressor);
+      compressor.connect(ctx.destination);
+
+      audioGraph.current = {
+        ctx,
+        source,
+        bassFilter,
+        midFilter,
+        trebleFilter,
+        gainNode,
+        compressor,
+        active: true,
+      };
+    } catch (e) {
+      console.warn("Web Audio API fallback to direct volume:", e);
+    }
+  };
 
   // Unified single playback and track transition controller
   useEffect(() => {
@@ -74,6 +154,10 @@ export function AudioEngine() {
       audio.src = streamUrl;
       audio.load();
       if (isPlaying) {
+        initWebAudio();
+        if (audioGraph.current?.ctx.state === "suspended") {
+          audioGraph.current.ctx.resume().catch(() => {});
+        }
         usePlayer.getState().setBuffering(true);
         tryPlay(audio);
       } else {
@@ -82,6 +166,10 @@ export function AudioEngine() {
     } else {
       // Same track: purely handle play / pause toggling
       if (isPlaying) {
+        initWebAudio();
+        if (audioGraph.current?.ctx.state === "suspended") {
+          audioGraph.current.ctx.resume().catch(() => {});
+        }
         if (audio.paused) {
           tryPlay(audio);
         }
@@ -102,9 +190,28 @@ export function AudioEngine() {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    audio.volume = Math.min(1, Math.max(0, volume));
-    audio.muted = muted;
-  }, [volume, muted]);
+
+    const targetGain = calculatePerceptualGain(volume, muted);
+
+    if (audioGraph.current && audioGraph.current.active) {
+      const { ctx, gainNode, bassFilter, midFilter, trebleFilter } = audioGraph.current;
+      if (ctx.state === "suspended" && isPlaying) {
+        ctx.resume().catch(() => {});
+      }
+      const now = ctx.currentTime;
+      gainNode.gain.setTargetAtTime(targetGain, now, 0.02);
+      bassFilter.gain.setTargetAtTime(customEq.bass, now, 0.04);
+      midFilter.gain.setTargetAtTime(customEq.mid, now, 0.04);
+      trebleFilter.gain.setTargetAtTime(customEq.treble, now, 0.04);
+
+      // Keep underlying media element fully open when passing through audio graph
+      audio.volume = 1.0;
+      audio.muted = false;
+    } else {
+      audio.volume = Math.min(1, Math.max(0, volume <= 1 ? Math.pow(volume, 2) : 1));
+      audio.muted = muted;
+    }
+  }, [volume, muted, customEq, isPlaying]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -410,8 +517,7 @@ export function AudioEngine() {
           if (e.shiftKey || isInteractive(e.target)) return;
           e.preventDefault();
           const delta = e.key === "ArrowUp" ? VOLUME_STEP : -VOLUME_STEP;
-          const base = s.muted ? 0 : s.volume;
-          s.setVolume(Math.min(1, Math.max(0, Math.round((base + delta) * 100) / 100)));
+          s.changeVolumeBy(delta);
           return;
         }
         case "m":
@@ -436,5 +542,5 @@ export function AudioEngine() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  return <audio ref={audioRef} preload="auto" className="hidden" aria-hidden="true" />;
+  return <audio ref={audioRef} crossOrigin="anonymous" preload="auto" className="hidden" aria-hidden="true" />;
 }

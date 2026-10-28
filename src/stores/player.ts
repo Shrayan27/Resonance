@@ -6,6 +6,62 @@ import type { Track } from "@/lib/types";
 
 export type RepeatMode = "off" | "all" | "one";
 
+export type EqPreset =
+  | "flat"
+  | "bass_boost"
+  | "vocal_boost"
+  | "electronic"
+  | "rock"
+  | "loudness";
+
+export interface EqBandGains {
+  bass: number; // dB (-12 to +12)
+  mid: number;  // dB (-12 to +12)
+  treble: number; // dB (-12 to +12)
+}
+
+export const EQ_PRESETS: Record<
+  EqPreset,
+  { name: string; description: string; gains: EqBandGains; icon: string }
+> = {
+  flat: {
+    name: "Balanced (Flat)",
+    description: "Original studio master without coloration",
+    gains: { bass: 0, mid: 0, treble: 0 },
+    icon: "⚖️",
+  },
+  bass_boost: {
+    name: "Bass Boost",
+    description: "Deep, punchy low-end for Punjabi, Hip-Hop & EDM",
+    gains: { bass: 7, mid: 0, treble: 1 },
+    icon: "🔊",
+  },
+  vocal_boost: {
+    name: "Vocal Clarity",
+    description: "Crisp voice separation for Ghazals & Melodies",
+    gains: { bass: -2, mid: 5, treble: 2 },
+    icon: "🎙️",
+  },
+  electronic: {
+    name: "Electronic / Club",
+    description: "Vibrant highs & deep sub-bass club energy",
+    gains: { bass: 6, mid: -1, treble: 5 },
+    icon: "⚡",
+  },
+  rock: {
+    name: "Acoustic / Rock",
+    description: "Warm mids with live acoustic presence",
+    gains: { bass: 3, mid: 4, treble: 3 },
+    icon: "🎸",
+  },
+  loudness: {
+    name: "Loudness Contour",
+    description: "Full-frequency punch at lower volumes",
+    gains: { bass: 4, mid: -2, treble: 4 },
+    icon: "💥",
+  },
+};
+
 interface PlayerState {
   queue: Track[];
   index: number;
@@ -13,6 +69,11 @@ interface PlayerState {
   shuffle: boolean;
   repeat: RepeatMode;
   volume: number;
+  volumeBoostLimit: number;
+  volumeHudNonce: number;
+  eqPreset: EqPreset;
+  customEq: EqBandGains;
+  showEqModal: boolean;
   muted: boolean;
   /** Seconds. Written by the audio engine; read by the UI. */
   position: number;
@@ -36,7 +97,11 @@ interface PlayerState {
   seek: (seconds: number) => void;
   seekBy: (delta: number) => void;
   playTrackWithSmartQueue: (track: Track, searchContext?: Track[]) => Promise<void>;
-  setVolume: (v: number) => void;
+  setVolume: (v: number, triggerHud?: boolean) => void;
+  changeVolumeBy: (delta: number) => void;
+  setEqPreset: (preset: EqPreset) => void;
+  setCustomEq: (bands: Partial<EqBandGains>) => void;
+  setShowEqModal: (show: boolean) => void;
   toggleMute: () => void;
   toggleShuffle: () => void;
   cycleRepeat: () => void;
@@ -60,6 +125,11 @@ export const usePlayer = create<PlayerState>()(
       shuffle: false,
       repeat: "off",
       volume: 0.7,
+      volumeBoostLimit: 2.0,
+      volumeHudNonce: 0,
+      eqPreset: "flat",
+      customEq: { bass: 0, mid: 0, treble: 0 },
+      showEqModal: false,
       muted: false,
       position: 0,
       duration: 0,
@@ -254,8 +324,42 @@ export const usePlayer = create<PlayerState>()(
         const target = Math.min(max, Math.max(0, position + delta));
         get().seek(target);
       },
-      setVolume: (volume) => set({ volume, muted: false }),
-      toggleMute: () => set((s) => ({ muted: !s.muted })),
+      setVolume: (volume, triggerHud = false) => {
+        const clamped = Math.min(get().volumeBoostLimit || 2.0, Math.max(0, volume));
+        set((s) => ({
+          volume: clamped,
+          muted: false,
+          volumeHudNonce: triggerHud ? s.volumeHudNonce + 1 : s.volumeHudNonce,
+        }));
+      },
+      changeVolumeBy: (delta) => {
+        const { volume, muted, volumeBoostLimit } = get();
+        const base = muted ? 0 : volume;
+        const target = Math.min(volumeBoostLimit || 2.0, Math.max(0, Math.round((base + delta) * 100) / 100));
+        set((s) => ({
+          volume: target,
+          muted: false,
+          volumeHudNonce: s.volumeHudNonce + 1,
+        }));
+      },
+      setEqPreset: (eqPreset) => {
+        const preset = EQ_PRESETS[eqPreset];
+        set({
+          eqPreset,
+          customEq: preset ? { ...preset.gains } : { bass: 0, mid: 0, treble: 0 },
+        });
+      },
+      setCustomEq: (bands) => {
+        set((s) => ({
+          customEq: { ...s.customEq, ...bands },
+        }));
+      },
+      setShowEqModal: (showEqModal) => set({ showEqModal }),
+      toggleMute: () =>
+        set((s) => ({
+          muted: !s.muted,
+          volumeHudNonce: s.volumeHudNonce + 1,
+        })),
       toggleShuffle: () => set((s) => ({ shuffle: !s.shuffle })),
       cycleRepeat: () =>
         set((s) => ({ repeat: s.repeat === "off" ? "all" : s.repeat === "all" ? "one" : "off" })),
@@ -283,7 +387,14 @@ export const usePlayer = create<PlayerState>()(
     }),
     {
       name: "resonance.player",
-      partialize: (s) => ({ volume: s.volume, shuffle: s.shuffle, repeat: s.repeat, muted: s.muted }),
+      partialize: (s) => ({
+        volume: s.volume,
+        shuffle: s.shuffle,
+        repeat: s.repeat,
+        muted: s.muted,
+        eqPreset: s.eqPreset,
+        customEq: s.customEq,
+      }),
     },
   ),
 );
