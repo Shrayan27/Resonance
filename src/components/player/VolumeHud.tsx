@@ -54,7 +54,7 @@ export function VolumeHud() {
       aria-live="polite"
       aria-atomic="true"
       className={cn(
-        "pointer-events-none fixed top-6 left-1/2 z-50 -translate-x-1/2 transition-all duration-300 ease-out",
+        "pointer-events-none fixed top-6 left-1/2 z-[80] -translate-x-1/2 transition-all duration-300 ease-out",
         visible
           ? "opacity-100 translate-y-0 scale-100"
           : "opacity-0 -translate-y-3 scale-95 pointer-events-none",

@@ -566,9 +566,9 @@ export function PlayerBar() {
 
   return (
     <TooltipProvider delay={400}>
-      <VolumeHud />
-      <EqualizerModal />
       <MobilePlayerModal open={mobileOpen} onClose={() => setMobileOpen(false)} hasTrack={hasTrack} />
+      <EqualizerModal />
+      <VolumeHud />
       <footer
         aria-label="Player"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#0b0c0e]/95 text-white backdrop-blur-md pb-[env(safe-area-inset-bottom,0px)]"
