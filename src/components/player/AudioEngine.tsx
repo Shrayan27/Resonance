@@ -412,15 +412,25 @@ export function AudioEngine() {
       navigator.mediaSession.metadata = null;
       return;
     }
-    const art = track.artworkLarge || track.artwork || "/icon.svg";
-    const artwork = [
-      { src: art, sizes: "96x96", type: "image/jpeg" },
-      { src: art, sizes: "128x128", type: "image/jpeg" },
-      { src: art, sizes: "192x192", type: "image/jpeg" },
-      { src: art, sizes: "256x256", type: "image/jpeg" },
-      { src: art, sizes: "384x384", type: "image/jpeg" },
-      { src: art, sizes: "512x512", type: "image/jpeg" },
-    ];
+    const rawArt = track.artworkLarge || track.artwork || "";
+    let art = rawArt;
+    if (art.startsWith("http://")) {
+      art = art.replace("http://", "https://");
+    } else if (!art.startsWith("https://") && typeof window !== "undefined") {
+      art = `${window.location.origin}${art.startsWith("/") ? "" : "/"}${art || "icon.svg"}`;
+    }
+
+    const artwork = art
+      ? [
+          { src: art, sizes: "96x96" },
+          { src: art, sizes: "128x128" },
+          { src: art, sizes: "192x192" },
+          { src: art, sizes: "256x256" },
+          { src: art, sizes: "384x384" },
+          { src: art, sizes: "512x512" },
+        ]
+      : [];
+
     navigator.mediaSession.metadata = new MediaMetadata({
       title: track.title,
       artist: track.artist.name,
