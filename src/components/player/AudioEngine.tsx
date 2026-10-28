@@ -306,6 +306,18 @@ export function AudioEngine() {
     const onPause = () => {
       store.getState().setBuffering(false);
       reportProgress(true);
+
+      // Guard: When the mobile phone screen locks, iOS/Android transitions the tab to background (document.hidden = true).
+      // Keep playing smoothly through the lock transition if playback was active.
+      if (typeof document !== "undefined" && document.hidden && store.getState().isPlaying) {
+        if (audio && !audio.ended && audio.src) {
+          audio.play().catch(() => {
+            store.getState().pause();
+          });
+          return;
+        }
+      }
+
       if (store.getState().isPlaying) {
         store.getState().pause();
       }
@@ -400,13 +412,19 @@ export function AudioEngine() {
       navigator.mediaSession.metadata = null;
       return;
     }
-    const artwork = [track.artwork, track.artworkLarge]
-      .filter(Boolean)
-      .map((src, i) => ({ src, sizes: i === 0 ? "150x150" : "480x480" }));
+    const art = track.artworkLarge || track.artwork || "/icon.svg";
+    const artwork = [
+      { src: art, sizes: "96x96", type: "image/jpeg" },
+      { src: art, sizes: "128x128", type: "image/jpeg" },
+      { src: art, sizes: "192x192", type: "image/jpeg" },
+      { src: art, sizes: "256x256", type: "image/jpeg" },
+      { src: art, sizes: "384x384", type: "image/jpeg" },
+      { src: art, sizes: "512x512", type: "image/jpeg" },
+    ];
     navigator.mediaSession.metadata = new MediaMetadata({
       title: track.title,
       artist: track.artist.name,
-      album: track.album ?? "",
+      album: track.album || "Resonance",
       artwork,
     });
   }, [track]);
@@ -552,5 +570,29 @@ export function AudioEngine() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  return <audio ref={audioRef} preload="auto" className="hidden" aria-hidden="true" />;
+  // Ensure audio continues playing without interruption when user locks their phone
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      const audio = audioRef.current;
+      if (!audio) return;
+      const s = usePlayer.getState();
+      if (document.hidden && s.isPlaying && !audio.ended && audio.src) {
+        if (audio.paused) {
+          audio.play().catch(() => {});
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, []);
+
+  return (
+    <audio
+      ref={audioRef}
+      preload="auto"
+      playsInline
+      className="fixed -left-[9999px] -top-[9999px] size-px opacity-0 pointer-events-none"
+      aria-hidden="true"
+    />
+  );
 }
